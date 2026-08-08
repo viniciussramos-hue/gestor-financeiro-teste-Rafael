@@ -3,8 +3,6 @@ import difflib
 import os
 import re
 import sqlite3
-import tkinter as tk
-from tkinter import filedialog
 import pandas as pd
 import pdfplumber
 import streamlit as st
@@ -2620,59 +2618,34 @@ elif st.session_state.pagina_atual == "📋 Extrato & Backup":
       " Backup"
   )
   st.write(
-      "Faça download do banco de dados, exporte planilhas ou escolha onde deseja salvar os arquivos no computador."
+      "Faça download do banco de dados ou exporte planilhas utilizando os botões abaixo."
   )
 
   col_exp1, col_exp2 = st.columns(2)
   with col_exp1:
-    if st.button("💾 Salvar Banco (.db) Escolhendo Onde Salvar no PC", use_container_width=True):
-      try:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        caminho_salvar = filedialog.asksaveasfilename(
-            defaultextension=".db",
-            filetypes=[("Database SQLite", "*.db"), ("Todos os arquivos", "*.*")],
-            title="Escolha onde salvar o Backup do Banco de Dados",
-            initialfile="gestor_financeiro_backup.db"
-        )
-        if caminho_salvar:
-          with open("gestor_financeiro.db", "rb") as f_origem:
-            with open(caminho_salvar, "wb") as f_destino:
-              f_destino.write(f_origem.read())
-          st.success(f"Backup salvo com sucesso em: {caminho_salvar}")
-        else:
-          st.info("Operação cancelada pelo usuário.")
-      except Exception as e:
-        with open("gestor_financeiro.db", "rb") as f:
-          st.download_button("💾 Clique aqui para baixar o Banco (.db)", f, "gestor_financeiro.db", use_container_width=True)
+    with open("gestor_financeiro.db", "rb") as f_db:
+      st.download_button(
+          "💾 Baixar Banco de Dados (.db)",
+          f_db,
+          file_name="gestor_financeiro.db",
+          mime="application/octet-stream",
+          use_container_width=True
+      )
 
   with col_exp2:
-    if st.button("📊 Salvar Planilha Extrato (CSV) Escolhendo Onde Salvar", use_container_width=True):
-      df_extrato_full = pd.read_sql("SELECT * FROM transacoes", conn)
-      if not df_extrato_full.empty:
-        df_extrato_full["data"] = df_extrato_full["data"].apply(formatar_data_ptbr)
-        csv_texto = df_extrato_full.to_csv(index=False)
-        try:
-          root = tk.Tk()
-          root.withdraw()
-          root.attributes("-topmost", True)
-          caminho_csv = filedialog.asksaveasfilename(
-              defaultextension=".csv",
-              filetypes=[("Arquivo CSV", "*.csv"), ("Todos os arquivos", "*.*")],
-              title="Escolha onde salvar a Planilha do Extrato",
-              initialfile="extrato_financeiro.csv"
-          )
-          if caminho_csv:
-            with open(caminho_csv, "w", encoding="utf-8") as f_csv:
-              f_csv.write(csv_texto)
-            st.success(f"Planilha salva com sucesso em: {caminho_csv}")
-          else:
-            st.info("Operação cancelada pelo usuário.")
-        except Exception as e:
-          st.download_button("📥 Baixar Planilha CSV", csv_texto.encode("utf-8"), "extrato_financeiro.csv", mime="text/csv", use_container_width=True)
-      else:
-        st.warning("Não há transações no extrato para exportar.")
+    df_extrato_full = pd.read_sql("SELECT * FROM transacoes", conn)
+    if not df_extrato_full.empty:
+      df_extrato_full["data"] = df_extrato_full["data"].apply(formatar_data_ptbr)
+      csv_texto = df_extrato_full.to_csv(index=False)
+      st.download_button(
+          "📥 Baixar Planilha Extrato (CSV)",
+          csv_texto.encode("utf-8"),
+          file_name="extrato_financeiro.csv",
+          mime="text/csv",
+          use_container_width=True
+      )
+    else:
+      st.button("📥 Baixar Planilha Extrato (CSV)", disabled=True, use_container_width=True)
 
   st.markdown("---")
   st.markdown("### ⚠️ Zona de Perigo — Exclusão Geral de Dados")
@@ -3154,7 +3127,7 @@ elif st.session_state.pagina_atual == "📄 Holerites":
     )
     st.line_chart(
         df_holerites.set_index("mes_ano")[[
-            "sal_bruto",
+            "salario_bruto",
             "liquido",
             "total_descontos",
         ]]
