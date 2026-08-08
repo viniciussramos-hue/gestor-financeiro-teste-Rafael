@@ -417,15 +417,6 @@ def botao_voltar():
 # ==========================================
 
 if st.session_state.pagina_atual == "🏠 Início / Painel":
-  
-  # --- IMAGEM / GRÁFICO ILUSTRATIVO DE DESTAQUE ---
-  st.image(
-      "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?q=80&w=1200&auto=format&fit=crop",
-      caption="Gestão Financeira & Controle Estratégico",
-      use_container_width=True
-  )
-  st.markdown("<br>", unsafe_allow_html=True)
-
   st.markdown(
       """
     <div class="section-indicator">
