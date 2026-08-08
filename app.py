@@ -2848,11 +2848,49 @@ elif st.session_state.pagina_atual == "📋 Extrato & Backup":
       )
 
     if not df_extrato_filtrado.empty:
-      df_extrato_filtrado["data"] = df_extrato_filtrado["data"].apply(formatar_data_ptbr)
+      df_extrato_filtrado_exib = df_extrato_filtrado.copy()
+      df_extrato_filtrado_exib["data"] = df_extrato_filtrado_exib["data"].apply(formatar_data_ptbr)
       st.write(
-          f"### 📋 Resultados Encontrados ({len(df_extrato_filtrado)} registros)"
+          f"### 📋 Resultados Encontrados ({len(df_extrato_filtrado_exib)} registros)"
       )
-      st.dataframe(df_extrato_filtrado, use_container_width=True)
+      st.dataframe(df_extrato_filtrado_exib, use_container_width=True, hide_index=True)
+
+      st.markdown("### ⚙️ Gerenciar / Editar / Excluir Lançamentos do Extrato")
+      id_trans_sel = st.selectbox(
+          "Selecione o ID da transação para editar ou excluir:",
+          df_extrato_filtrado["id"].tolist(),
+          key="sel_transacao_gerenciar"
+      )
+
+      if id_trans_sel:
+        row_trans_atual = df_extrato_filtrado[df_extrato_filtrado["id"] == id_trans_sel].iloc[0]
+        
+        col_ed_op1, col_ed_op2 = st.columns(2)
+        with col_ed_op1:
+          st.markdown(f"**Editando Lançamento ID {id_trans_sel}:**")
+          with st.form(f"form_editar_transacao_{id_trans_sel}"):
+            novo_tipo_t = st.selectbox("Tipo:", ["Despesa", "Receita"], index=0 if row_trans_atual["tipo"] == "Despesa" else 1)
+            nova_desc_t = st.text_input("Descrição:", value=row_trans_atual["descricao"])
+            novo_val_t = st.number_input("Valor (R$):", min_value=0.0, value=float(row_trans_atual["valor"]), step=1.0, format="%.2f")
+            nova_data_t = st.date_input("Data (DD/MM/AAAA):", value=datetime.strptime(str(row_trans_atual["data"])[:10], "%Y-%m-%d").date(), format="DD/MM/YYYY")
+            
+            if st.form_submit_button("Salvar Alterações da Transação", use_container_width=True):
+              c.execute(
+                  "UPDATE transacoes SET tipo = ?, descricao = ?, valor = ?, data = ? WHERE id = ?",
+                  (novo_tipo_t, nova_desc_t.strip(), novo_val_t, nova_data_t.strftime("%Y-%m-%d"), id_trans_sel)
+              )
+              conn.commit()
+              st.success(f"Transação ID {id_trans_sel} atualizada com sucesso!")
+              st.rerun()
+
+        with col_ed_op2:
+          st.markdown(f"**Excluir Lançamento ID {id_trans_sel}:**")
+          st.write(f"Deseja remover permanentemente o registro *{row_trans_atual['descricao']}* (R$ {row_trans_atual['valor']:,.2f})?")
+          if st.button("🗑️ Excluir Transação Selecionada", use_container_width=True):
+            c.execute("DELETE FROM transacoes WHERE id = ?", (id_trans_sel,))
+            conn.commit()
+            st.success(f"Transação ID {id_trans_sel} excluída com sucesso!")
+            st.rerun()
     else:
       st.info(
           "Nenhuma transação encontrada com os filtros e termos pesquisados."
