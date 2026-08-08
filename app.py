@@ -127,6 +127,9 @@ c.execute("""CREATE TABLE IF NOT EXISTS transacoes
 c.execute("""CREATE TABLE IF NOT EXISTS contas 
              (id INTEGER PRIMARY KEY AUTOINCREMENT, vencimento TEXT, descricao TEXT, valor REAL, pago INTEGER)""")
 
+c.execute("""CREATE TABLE IF NOT EXISTS contas_receber 
+             (id INTEGER PRIMARY KEY AUTOINCREMENT, vencimento TEXT, descricao TEXT, valor REAL, recebido INTEGER)""")
+
 c.execute("""CREATE TABLE IF NOT EXISTS categorias 
              (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT)""")
 
@@ -443,7 +446,7 @@ if st.session_state.pagina_atual == "🏠 Início / Painel":
       mudar_pagina("🟢 Entradas & Salários")
       st.rerun()
   with c3:
-    if st.button("📅 Contas a Pagar", use_container_width=True):
+    if st.button("📅 Contas a Pagar & Receber", use_container_width=True):
       mudar_pagina("📅 Contas a Pagar")
       st.rerun()
   with c4:
@@ -485,20 +488,23 @@ if st.session_state.pagina_atual == "🏠 Início / Painel":
       st.rerun()
   st.markdown("</div>", unsafe_allow_html=True)
 
-  # Grupo 3 & 4: Configuração, Suporte, Relatórios & Backup
+  # Grupo 3 & 4: Novas Funções (Voz e Chatbot IA), Configuração & Relatórios
   col_a, col_b = st.columns(2)
   with col_a:
     st.markdown(
-        '<div class="group-card"><div class="group-title">Configuração &'
-        " Suporte</div>",
+        '<div class="group-card"><div class="group-title">Inovação & IA & Suporte</div>',
         unsafe_allow_html=True,
     )
-    sub1, sub2 = st.columns(2)
+    sub1, sub2, sub3 = st.columns(3)
     with sub1:
-      if st.button("🏷️ Categorias & Ícones", use_container_width=True):
-        mudar_pagina("🏷️ Categorias & Ícones")
+      if st.button("🎙️ Lançar por Voz", use_container_width=True):
+        mudar_pagina("🎙️ Lançar por Voz")
         st.rerun()
     with sub2:
+      if st.button("🤖 Assistente IA & Chat", use_container_width=True):
+        mudar_pagina("🤖 Assistente IA")
+        st.rerun()
+    with sub3:
       if st.button("❤️ Saúde Financeira", use_container_width=True):
         mudar_pagina("❤️ Saúde Financeira")
         st.rerun()
@@ -506,16 +512,19 @@ if st.session_state.pagina_atual == "🏠 Início / Painel":
 
   with col_b:
     st.markdown(
-        '<div class="group-card"><div class="group-title">Relatórios &'
-        " Backup</div>",
+        '<div class="group-card"><div class="group-title">Configuração, Relatórios & Backup</div>',
         unsafe_allow_html=True,
     )
-    sub1, sub2 = st.columns(2)
+    sub1, sub2, sub3 = st.columns(3)
     with sub1:
-      if st.button("📄 Holerites & PDF", use_container_width=True):
-        mudar_pagina("📄 Holerites")
+      if st.button("🏷️ Categorias", use_container_width=True):
+        mudar_pagina("🏷️ Categorias & Ícones")
         st.rerun()
     with sub2:
+      if st.button("📄 Holerites", use_container_width=True):
+        mudar_pagina("📄 Holerites")
+        st.rerun()
+    with sub3:
       if st.button("📋 Extrato & Backup", use_container_width=True):
         mudar_pagina("📋 Extrato & Backup")
         st.rerun()
@@ -642,7 +651,157 @@ elif st.session_state.pagina_atual == "🟢 Entradas & Salários":
   botao_voltar()
 
 # ==========================================
-# --- SEÇÃO 2.1: VEÍCULOS, MANUTENÇÕES & COMBUSTÍVEIS ---
+# --- SEÇÃO 2.1: LANÇAR DESPESA POR COMANDO DE VOZ ---
+# ==========================================
+elif st.session_state.pagina_atual == "🎙️ Lançar por Voz":
+  st.subheader("🎙️ Lançamento Inteligente de Despesas por Comando de Voz / Texto Falado")
+  st.write(
+      "Simule ou grave seu comando de voz. Digite ou dite no formato natural, por exemplo: "
+      "<i>'Gastei 45 reais na farmácia hoje'</i> ou <i>'Paguei 120 de luz ontem'</i>."
+  )
+
+  # Integração simulada de áudio / caixa de fala natural
+  comando_voz_input = st.text_area(
+      "💬 Comando de Voz Capturado (ou digite sua frase natural):",
+      value="",
+      placeholder="Ex: Gastei 89.90 no supermercado shibata hoje...",
+      help="Você pode digitar ou dite sua frase financeira livremente."
+  )
+
+  if st.button("Processar Comando de Voz & Lançar Automaticamente", use_container_width=True):
+    if comando_voz_input.strip():
+      texto_cv = comando_voz_input.strip()
+      
+      # Extração inteligente de valores numéricos na frase
+      nums_encontrados = re.findall(r"(\d+(?:[.,]\d+)?)", texto_cv.replace(",", "."))
+      valor_extraido = float(nums_encontrados[0]) if nums_encontrados else 0.0
+
+      if valor_extraido > 0:
+        # Descrição e Categorização Inteligente
+        desc_extraida = texto_cv
+        tipo_trans = "Receita" if any(p in texto_cv.lower() for p in ["recebi", "ganhei", "salario", "PIX recebido"]) else "Despesa"
+        cat_extraida = categorizar_automaticamente(desc_extraida, tipo_trans)
+        data_hoje_str = date.today().strftime("%Y-%m-%d")
+
+        c.execute(
+            "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
+            (data_hoje_str, tipo_trans, desc_extraida, cat_extraida, valor_extraido, "Voz_IA")
+        )
+        conn.commit()
+
+        st.success(f"🎉 **Lançamento por Voz Realizado com Sucesso!**")
+        st.markdown(
+            f"""
+            <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 15px; margin-top: 10px;">
+                <p><b>Tipo:</b> {tipo_trans}</p>
+                <p><b>Descrição:</b> {desc_extraida}</p>
+                <p><b>Valor:</b> R$ {valor_extraido:,.2f}</p>
+                <p><b>Categoria Atribuída:</b> {cat_extraida}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+      else:
+        st.error("Não foi possível identificar um valor numérico válido no comando falado/digitado. Tente incluir o valor (ex: '45 reais').")
+    else:
+      st.warning("Insira um comando de voz ou frase para processar.")
+
+  st.markdown("---")
+  st.subheader("📋 Últimos Lançamentos via Comando de Voz")
+  df_voz_all = pd.read_sql("SELECT * FROM transacoes WHERE origem = 'Voz_IA' ORDER BY id DESC", conn)
+  if not df_voz_all.empty:
+    st.dataframe(df_voz_all[["data", "tipo", "descricao", "categoria", "valor"]], use_container_width=True, hide_index=True)
+  else:
+    st.info("Nenhum lançamento por voz registrado ainda.")
+
+  botao_voltar()
+
+# ==========================================
+# --- SEÇÃO 2.2: ASSISTENTE IA & CHATBOT ---
+# ==========================================
+elif st.session_state.pagina_atual == "🤖 Assistente IA":
+  st.subheader("🤖 Assistente Financeiro Inteligente (Chatbot IA)")
+  st.write(
+      "Converse com a Inteligência Artificial do seu gestor. Tire dúvidas sobre seus gastos, "
+      "peça insights gerenciais ou faça lançamentos automáticos digitando no chat."
+  )
+
+  if "historico_chat" not in st.session_state:
+    st.session_state.historico_chat = [
+        {"role": "assistant", "content": "Olá Vinicius! Sou seu assistente financeiro IA. Como posso ajudar nas suas finanças hoje? Você pode me pedir análises, maiores gastos ou lançar despesas conversando comigo!"}
+    ]
+
+  # Exibição do histórico de conversas do chat
+  for msg in st.session_state.historico_chat:
+    with st.chat_message(msg["role"]):
+      st.write(msg["content"])
+
+  # Entrada do usuário no chat
+  user_query = st.chat_input("Digite sua pergunta ou comando para o Assistente IA...")
+
+  if user_query:
+    st.session_state.historico_chat.append({"role": "user", "content": user_query})
+    with st.chat_message("user"):
+      st.write(user_query)
+
+    # Processamento e resposta inteligente da IA baseada no banco de dados SQLite real
+    query_up = user_query.upper()
+    resposta_ia = ""
+
+    df_trans_ia = pd.read_sql("SELECT * FROM transacoes", conn)
+    df_contas_ia = pd.read_sql("SELECT * FROM contas WHERE pago = 0", conn)
+    df_cartao_ia = pd.read_sql("SELECT * FROM cartao_credito", conn)
+
+    total_rec_ia = df_trans_ia[df_trans_ia["tipo"] == "Receita"]["valor"].sum() if not df_trans_ia.empty else 0.0
+    total_desp_ia = df_trans_ia[df_trans_ia["tipo"] == "Despesa"]["valor"].sum() if not df_trans_ia.empty else 0.0
+    saldo_caixa_ia = total_rec_ia - total_desp_ia
+
+    if any(k in query_up for k in ["GASTO", "MAIOR", "QUANTO GASTEI"]):
+      if not df_trans_ia.empty:
+        df_d_ia = df_trans_ia[df_trans_ia["tipo"] == "Despesa"]
+        if not df_d_ia.empty:
+          maior_gasto = df_d_ia.sort_values(by="valor", ascending=False).iloc[0]
+          resposta_ia = f"📊 O seu maior gasto registrado é **{maior_gasto['descricao']}** na categoria *{maior_gasto['categoria']}* no valor de **R$ {maior_gasto['valor']:,.2f}**."
+        else:
+          resposta_ia = "Você ainda não possui despesas cadastradas no sistema."
+      else:
+        resposta_ia = "Seu banco de dados de transações está vazio no momento."
+
+    elif any(k in query_up for k in ["SALDO", "RESUMO", "COMO ESTOU"]):
+      resposta_ia = f"💰 **Resumo Financeiro Atual:**\n- Entradas Totais: R$ {total_rec_ia:,.2f}\n- Saídas Totais: R$ {total_desp_ia:,.2f}\n- Saldo em Caixa: R$ {saldo_caixa_ia:,.2f}"
+
+    elif any(k in query_up for k in ["PAGUEI", "GASTEI", "COMPREI", "LANCEI"]):
+      # Extração e lançamento automático por chat
+      nums_chat = re.findall(r"(\d+(?:[.,]\d+)?)", user_query.replace(",", "."))
+      if nums_chat:
+        val_chat = float(nums_chat[0])
+        cat_c = categorizar_automaticamente(user_query, "Despesa")
+        c.execute(
+            "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
+            (date.today().strftime("%Y-%m-%d"), "Despesa", user_query, cat_c, val_chat, "Chat_IA")
+        )
+        conn.commit()
+        resposta_ia = f"✅ Lançado com sucesso pelo chat!\n- Descrição: {user_query}\n- Valor: R$ {val_chat:,.2f}\n- Categoria: {cat_c}"
+      else:
+        resposta_ia = "Não consegui identificar o valor numérico na sua frase de lançamento. Tente incluir o valor (ex: 'Gastei 150 no mercado')."
+
+    else:
+      resposta_ia = (
+          f"🤖 Compreendi sua pergunta. Analisei seus dados atuais: Saldo líquido projetado em R$ {saldo_caixa_ia:,.2f}. "
+          "Você pode me pedir para:\n"
+          "1. Mostrar seu maior gasto\n"
+          "2. Ver o resumo de saldo e receitas\n"
+          "3. Lançar despesas ou contas conversando diretamente comigo!"
+      )
+
+    st.session_state.historico_chat.append({"role": "assistant", "content": resposta_ia})
+    with st.chat_message("assistant"):
+      st.write(resposta_ia)
+
+  botao_voltar()
+
+# ==========================================
+# --- SEÇÃO 2.3: VEÍCULOS, MANUTENÇÕES & COMBUSTÍVEIS ---
 # ==========================================
 elif st.session_state.pagina_atual == "🚗 Veículos & Manutenção":
   st.subheader("🚗 Central de Veículos, Manutenções & Consumo de Combustível")
@@ -1008,30 +1167,50 @@ elif st.session_state.pagina_atual == "📥 Dashboard Banco":
 # --- SEÇÃO 4: PREVISÃO FINANCEIRA ---
 # ==========================================
 elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
-  st.subheader("📅 Previsão Financeira")
-  st.write("Visualize suas finanças em qualquer período de forma detalhada e interativa.")
+  st.subheader("📅 Previsão Financeira & Simulador de Imprevistos")
+  st.write("Visualize suas finanças detalhadamente por mês ou acumulado anual, incluindo entradas previstas, contas a pagar, contas a receber e simulações.")
 
   if "prev_data_atual" not in st.session_state:
     st.session_state.prev_data_atual = datetime.now().replace(day=1)
 
-  col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
+  # SELETOR DE PERÍODO E FORMATO ESTILO BOTÕES COM RADIO/COLUNAS
+  col_p1, col_p2, col_p3 = st.columns([3, 3, 2])
   with col_p1:
-    tipo_visao = st.radio("Período:", ["Mensal", "Anual"], horizontal=True, label_visibility="collapsed")
+    tipo_visao = st.radio("Período da Visão:", ["Mensal", "Anual"], horizontal=True)
   with col_p2:
-    formato_exibicao = st.radio("Formato:", ["Gráfico", "Tabela"], horizontal=True, label_visibility="collapsed")
+    formato_exibicao = st.radio("Formato de Exibição:", ["Gráfico", "Tabela"], horizontal=True)
   with col_p3:
-    if st.button("📥 Exportar Relatório Previsto", use_container_width=True):
+    st.write("")
+    if st.button("📥 Exportar Relatório", use_container_width=True):
       st.success("Relatório de previsão exportado com sucesso!")
 
   st.markdown("---")
 
-  col_nav1, col_nav2, col_nav3 = st.columns([1, 4, 1])
-  with col_nav1:
-    if st.button("❮ Anterior", use_container_width=True):
+  # SELETOR DE DATAS NO FORMATO CALENDÁRIO COM NAVEGAÇÃO
+  col_nav_cal1, col_nav_cal2, col_nav_cal3 = st.columns([1, 4, 1])
+  with col_nav_cal1:
+    if st.button("❮ Mês Anterior", use_container_width=True):
       if tipo_visao == "Mensal":
         st.session_state.prev_data_atual = (st.session_state.prev_data_atual - timedelta(days=1)).replace(day=1)
       else:
         st.session_state.prev_data_atual = st.session_state.prev_data_atual.replace(year=st.session_state.prev_data_atual.year - 1)
+      st.rerun()
+
+  with col_nav_cal2:
+    data_calendario_escolhida = st.date_input(
+        "📅 Selecionar Data de Referência da Previsão:",
+        value=st.session_state.prev_data_atual,
+        key="picker_previsao_data"
+    )
+    if data_calendario_escolhida:
+      st.session_state.prev_data_atual = datetime.combine(data_calendario_escolhida, datetime.min.time()).replace(day=1)
+
+  with col_nav_cal3:
+    if st.button("Mês Seguinte ❯", use_container_width=True):
+      if tipo_visao == "Mensal":
+        st.session_state.prev_data_atual = (st.session_state.prev_data_atual + timedelta(days=32)).replace(day=1)
+      else:
+        st.session_state.prev_data_atual = st.session_state.prev_data_atual.replace(year=st.session_state.prev_data_atual.year + 1)
       st.rerun()
 
   meses_nomes_pt = {
@@ -1042,69 +1221,98 @@ elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
   mes_ativo_num = st.session_state.prev_data_atual.month
   nome_mes_exib = meses_nomes_pt[mes_ativo_num]
 
-  with col_nav2:
-    if tipo_visao == "Mensal":
-      st.markdown(f"<h3 style='text-align: center; color: #f8fafc; margin: 0;'>{nome_mes_exib} de {ano_ativo}</h3>", unsafe_allow_html=True)
-    else:
-      st.markdown(f"<h3 style='text-align: center; color: #f8fafc; margin: 0;'>Ano de {ano_ativo}</h3>", unsafe_allow_html=True)
-
-  with col_nav3:
-    if st.button("Próximo ❯", use_container_width=True):
-      if tipo_visao == "Mensal":
-        st.session_state.prev_data_atual = (st.session_state.prev_data_atual + timedelta(days=32)).replace(day=1)
-      else:
-        st.session_state.prev_data_atual = st.session_state.prev_data_atual.replace(year=st.session_state.prev_data_atual.year + 1)
-      st.rerun()
+  if tipo_visao == "Mensal":
+    st.markdown(f"<h3 style='text-align: center; color: #f8fafc; margin: 15px 0;'>Referência: {nome_mes_exib} de {ano_ativo}</h3>", unsafe_allow_html=True)
+  else:
+    st.markdown(f"<h3 style='text-align: center; color: #f8fafc; margin: 15px 0;'>Referência Acumulada: Ano de {ano_ativo}</h3>", unsafe_allow_html=True)
 
   st.markdown("<br>", unsafe_allow_html=True)
 
   df_cartao_prev = pd.read_sql("SELECT * FROM cartao_credito", conn)
   df_contas_prev = pd.read_sql("SELECT * FROM contas WHERE pago = 0", conn)
+  df_receber_prev = pd.read_sql("SELECT * FROM contas_receber WHERE recebido = 0", conn)
   df_trans_prev = pd.read_sql("SELECT * FROM transacoes", conn)
 
   if not df_cartao_prev.empty:
     df_cartao_prev["data_dt"] = pd.to_datetime(df_cartao_prev["data"], errors="coerce")
-    if tipo_visao == "Mensal":
-      df_cartao_filtered = df_cartao_prev[(df_cartao_prev["data_dt"].dt.year == ano_ativo) & (df_cartao_prev["data_dt"].dt.month == mes_ativo_num)]
-    else:
-      df_cartao_filtered = df_cartao_prev[df_cartao_prev["data_dt"].dt.year == ano_ativo]
-    total_faturas = df_cartao_filtered["valor"].sum()
-  else:
-    total_faturas = 0.0
-
   if not df_contas_prev.empty:
     df_contas_prev["venc_dt"] = pd.to_datetime(df_contas_prev["vencimento"], errors="coerce")
-    if tipo_visao == "Mensal":
-      df_contas_filtered = df_contas_prev[(df_contas_prev["venc_dt"].dt.year == ano_ativo) & (df_contas_prev["venc_dt"].dt.month == mes_ativo_num)]
-    else:
-      df_contas_filtered = df_contas_prev[df_contas_prev["venc_dt"].dt.year == ano_ativo]
-    total_contas = df_contas_filtered["valor"].sum()
-  else:
-    total_contas = 0.0
-
+  if not df_receber_prev.empty:
+    df_receber_prev["venc_dt"] = pd.to_datetime(df_receber_prev["vencimento"], errors="coerce")
   if not df_trans_prev.empty:
     df_trans_prev["data_dt"] = pd.to_datetime(df_trans_prev["data"], errors="coerce")
-    if tipo_visao == "Mensal":
-      df_trans_filtered = df_trans_prev[(df_trans_prev["data_dt"].dt.year == ano_ativo) & (df_trans_prev["data_dt"].dt.month == mes_ativo_num)]
-    else:
-      df_trans_filtered = df_trans_prev[df_trans_prev["data_dt"].dt.year == ano_ativo]
-    
-    total_entradas_previstas = df_trans_filtered[df_trans_filtered["tipo"] == "Receita"]["valor"].sum()
-    total_saidas_manuais = df_trans_filtered[df_trans_filtered["tipo"] == "Despesa"]["valor"].sum()
-  else:
-    total_entradas_previstas = 0.0
-    total_saidas_manuais = 0.0
 
-  total_dividas = 0.0
-  total_saidas_previstas = total_faturas + total_contas + total_dividas + total_saidas_manuais
+  if tipo_visao == "Mensal":
+    f_cartao = df_cartao_prev[(df_cartao_prev["data_dt"].dt.year == ano_ativo) & (df_cartao_prev["data_dt"].dt.month == mes_ativo_num)] if not df_cartao_prev.empty else pd.DataFrame()
+    f_contas = df_contas_prev[(df_contas_prev["venc_dt"].dt.year == ano_ativo) & (df_contas_prev["venc_dt"].dt.month == mes_ativo_num)] if not df_contas_prev.empty else pd.DataFrame()
+    f_receber = df_receber_prev[(df_receber_prev["venc_dt"].dt.year == ano_ativo) & (df_receber_prev["venc_dt"].dt.month == mes_ativo_num)] if not df_receber_prev.empty else pd.DataFrame()
+    f_trans = df_trans_prev[(df_trans_prev["data_dt"].dt.year == ano_ativo) & (df_trans_prev["data_dt"].dt.month == mes_ativo_num)] if not df_trans_prev.empty else pd.DataFrame()
+    
+    total_faturas = f_cartao["valor"].sum() if not f_cartao.empty else 0.0
+    total_contas_pagar = f_contas["valor"].sum() if not f_contas.empty else 0.0
+    total_contas_receber = f_receber["valor"].sum() if not f_receber.empty else 0.0
+    
+    entradas_manuais = f_trans[f_trans["tipo"] == "Receita"]["valor"].sum() if not f_trans.empty else 0.0
+    saidas_manuais = f_trans[f_trans["tipo"] == "Despesa"]["valor"].sum() if not f_trans.empty else 0.0
+    
+    total_entradas_previstas = entradas_manuais + total_contas_receber
+    total_saidas_previstas = total_faturas + total_contas_pagar + saidas_manuais
+  else:
+    f_cartao = df_cartao_prev[df_cartao_prev["data_dt"].dt.year == ano_ativo] if not df_cartao_prev.empty else pd.DataFrame()
+    f_contas = df_contas_prev[df_contas_prev["venc_dt"].dt.year == ano_ativo] if not df_contas_prev.empty else pd.DataFrame()
+    f_receber = df_receber_prev[df_receber_prev["venc_dt"].dt.year == ano_ativo] if not df_receber_prev.empty else pd.DataFrame()
+    f_trans = df_trans_prev[df_trans_prev["data_dt"].dt.year == ano_ativo] if not df_trans_prev.empty else pd.DataFrame()
+
+    total_faturas = f_cartao["valor"].sum() if not f_cartao.empty else 0.0
+    total_contas_pagar = f_contas["valor"].sum() if not f_contas.empty else 0.0
+    total_contas_receber = f_receber["valor"].sum() if not f_receber.empty else 0.0
+
+    entradas_manuais = f_trans[f_trans["tipo"] == "Receita"]["valor"].sum() if not f_trans.empty else 0.0
+    saidas_manuais = f_trans[f_trans["tipo"] == "Despesa"]["valor"].sum() if not f_trans.empty else 0.0
+
+    total_entradas_previstas = entradas_manuais + total_contas_receber
+    total_saidas_previstas = total_faturas + total_contas_pagar + saidas_manuais
+
   saldo_projetado = total_entradas_previstas - total_saidas_previstas
+
+  # ==========================================
+  # --- CAMPO DE SIMULADOR DE IMPREVISTOS ---
+  # ==========================================
+  st.markdown("### 🧪 Simulador de Imprevistos & Ajustes Orçamentários")
+  st.write("Simule o impacto de receitas extras inesperadas ou gastos imprevistos no saldo projetado do período:")
+  
+  col_sim1, col_sim2 = st.columns(2)
+  with col_sim1:
+    valor_simulado_imprevisto = st.number_input(
+        "Valor do Imprevisto (R$):",
+        min_value=0.0,
+        value=0.00,
+        step=50.0,
+        format="%.2f",
+        help="Insira o valor do imprevisto financeiro."
+    )
+  with col_sim2:
+    tipo_imprevisto = st.selectbox(
+        "Tipo de Imprevisto:",
+        ["Gastos / Despesa Extra", "Entrada / Receita Extra"]
+    )
+
+  if valor_simulado_imprevisto > 0:
+    if tipo_imprevisto == "Gastos / Despesa Extra":
+      saldo_com_simulacao = saldo_projetado - valor_simulado_imprevisto
+      st.warning(f"⚠️ **Simulação Ativa (Despesa Extra):** O saldo projetado cairia de **R$ {saldo_projetado:,.2f}** para **R$ {saldo_com_simulacao:,.2f}**.")
+    else:
+      saldo_com_simulacao = saldo_projetado + valor_simulado_imprevisto
+      st.success(f"🟢 **Simulação Ativa (Receita Extra):** O saldo projetado subiria de **R$ {saldo_projetado:,.2f}** para **R$ {saldo_com_simulacao:,.2f}**.")
+
+  st.markdown("---")
 
   m1, m2, m3 = st.columns(3)
   with m1:
     st.markdown(
         f"""
         <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 20px;">
-            <span style="color: #4ade80; font-size: 13px; font-weight: 600;">🟢 TOTAL ENTRADAS</span>
+            <span style="color: #4ade80; font-size: 13px; font-weight: 600;">🟢 TOTAL ENTRADAS (Com A Receber)</span>
             <h2 style="color: #22c55e; margin: 5px 0 0 0;">R$ {total_entradas_previstas:,.2f}</h2>
         </div>
         """,
@@ -1133,63 +1341,95 @@ elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
 
   st.markdown("<br>", unsafe_allow_html=True)
 
-  st.markdown(
-      f"""
-      <div class="group-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-              <h4 style="color: #f8fafc; margin: 0; display: flex; align-items: center; gap: 8px;">📉 Saídas Previstas</h4>
-              <h4 style="color: #ef4444; margin: 0;">R$ {total_saidas_previstas:,.2f}</h4>
-          </div>
-          <hr style="border-color: var(--border-color); margin-bottom: 15px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
-              <span style="color: #94a3b8;">💳 Faturas de Cartão</span>
-              <span style="color: #f8fafc; font-weight: 600;">R$ {total_faturas:,.2f}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
-              <span style="color: #94a3b8;">📅 Contas a Pagar & Despesas</span>
-              <span style="color: #f8fafc; font-weight: 600;">R$ {total_contas + total_saidas_manuais:,.2f}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-              <span style="color: #94a3b8;">🏛️ Parcelas de Dívidas</span>
-              <span style="color: #f8fafc; font-weight: 600;">R$ {total_dividas:,.2f}</span>
-          </div>
-      </div>
-      """,
-      unsafe_allow_html=True,
-  )
+  col_det_s, col_det_e = st.columns(2)
+  with col_det_s:
+    st.markdown(
+        f"""
+        <div class="group-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="color: #f8fafc; margin: 0; display: flex; align-items: center; gap: 8px;">📉 Composição de Saídas</h4>
+                <h4 style="color: #ef4444; margin: 0;">R$ {total_saidas_previstas:,.2f}</h4>
+            </div>
+            <hr style="border-color: var(--border-color); margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <span style="color: #94a3b8;">💳 Faturas de Cartão</span>
+                <span style="color: #f8fafc; font-weight: 600;">R$ {total_faturas:,.2f}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <span style="color: #94a3b8;">📅 Contas a Pagar & Despesas</span>
+                <span style="color: #f8fafc; font-weight: 600;">R$ {total_contas_pagar + saidas_manuais:,.2f}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-  st.markdown(
-      f"""
-      <div class="group-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-              <h4 style="color: #f8fafc; margin: 0; display: flex; align-items: center; gap: 8px;">📈 Entradas Previstas</h4>
-              <h4 style="color: #22c55e; margin: 0;">R$ {total_entradas_previstas:,.2f}</h4>
-          </div>
-          <hr style="border-color: var(--border-color); margin-bottom: 15px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-              <span style="color: #94a3b8;">📥 Contas a Receber / Salários</span>
-              <span style="color: #f8fafc; font-weight: 600;">R$ {total_entradas_previstas:,.2f}</span>
-          </div>
-      </div>
-      """,
-      unsafe_allow_html=True,
-  )
+  with col_det_e:
+    st.markdown(
+        f"""
+        <div class="group-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="color: #f8fafc; margin: 0; display: flex; align-items: center; gap: 8px;">📈 Composição de Entradas</h4>
+                <h4 style="color: #22c55e; margin: 0;">R$ {total_entradas_previstas:,.2f}</h4>
+            </div>
+            <hr style="border-color: var(--border-color); margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <span style="color: #94a3b8;">📥 Contas a Receber Pendentes</span>
+                <span style="color: #f8fafc; font-weight: 600;">R$ {total_contas_receber:,.2f}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                <span style="color: #94a3b8;">🟢 Salários & Entradas Manuais</span>
+                <span style="color: #f8fafc; font-weight: 600;">R$ {entradas_manuais:,.2f}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-  if formato_exibicao == "Gráfico":
-    st.markdown("### 📊 Gráfico de Previsão de Fluxo")
-    df_graf_prev = pd.DataFrame({
-        "Categoria": ["Entradas", "Saídas", "Saldo Projetado"],
-        "Valor": [total_entradas_previstas, total_saidas_previstas, saldo_projetado]
+  # ==========================================
+  # --- TABELA DE EVOLUÇÃO MÊS A MÊS DO ANO ---
+  # ==========================================
+  st.markdown("---")
+  st.subheader(f"📊 Evolução Analítica Mês a Mês ({ano_ativo})")
+  st.write("Visão consolidada do comportamento financeiro mês a mês para planejamento de longo prazo:")
+
+  meses_resumo_lista = []
+  for m_num in range(1, 13):
+    m_nome = meses_nomes_pt[m_num]
+    
+    c_cart_m = df_cartao_prev[(df_cartao_prev["data_dt"].dt.year == ano_ativo) & (df_cartao_prev["data_dt"].dt.month == m_num)] if not df_cartao_prev.empty else pd.DataFrame()
+    c_pag_m = df_contas_prev[(df_contas_prev["venc_dt"].dt.year == ano_ativo) & (df_contas_prev["venc_dt"].dt.month == m_num)] if not df_contas_prev.empty else pd.DataFrame()
+    c_rec_m = df_receber_prev[(df_receber_prev["venc_dt"].dt.year == ano_ativo) & (df_receber_prev["venc_dt"].dt.month == m_num)] if not df_receber_prev.empty else pd.DataFrame()
+    c_trans_m = df_trans_prev[(df_trans_prev["data_dt"].dt.year == ano_ativo) & (df_trans_prev["data_dt"].dt.month == m_num)] if not df_trans_prev.empty else pd.DataFrame()
+
+    t_fat = c_cart_m["valor"].sum() if not c_cart_m.empty else 0.0
+    t_cp = c_pag_m["valor"].sum() if not c_pag_m.empty else 0.0
+    t_cr = c_rec_m["valor"].sum() if not c_rec_m.empty else 0.0
+    t_entradas_m = (c_trans_m[c_trans_m["tipo"] == "Receita"]["valor"].sum() if not c_trans_m.empty else 0.0) + t_cr
+    t_saidas_m = t_fat + t_cp + (c_trans_m[c_trans_m["tipo"] == "Despesa"]["valor"].sum() if not c_trans_m.empty else 0.0)
+    t_saldo_m = t_entradas_m - t_saidas_m
+
+    meses_resumo_lista.append({
+        "Mês": m_nome,
+        "Entradas (R$)": t_entradas_m,
+        "Saídas (R$)": t_saidas_m,
+        "Saldo Projetado (R$)": t_saldo_m
     })
-    st.bar_chart(df_graf_prev.set_index("Categoria"))
+
+  df_evolucao_meses = pd.DataFrame(meses_resumo_lista)
+  
+  if formato_exibicao == "Gráfico":
+    st.bar_chart(df_evolucao_meses.set_index("Mês")[["Entradas (R$)", "Saídas (R$)", "Saldo Projetado (R$)"]])
   else:
-    st.markdown("### 📋 Tabela Analítica da Previsão")
-    df_tabela_prev = pd.DataFrame([
-        {"Tipo": "Entrada Prevista", "Descrição": "Salários / Receitas Cadastradas", "Valor (R$)": total_entradas_previstas},
-        {"Tipo": "Saída Prevista", "Descrição": "Faturas de Cartão de Crédito", "Valor (R$)": total_faturas},
-        {"Tipo": "Saída Prevista", "Descrição": "Contas a Pagar Pendentes", "Valor (R$)": total_contas},
-    ])
-    st.dataframe(df_tabela_prev, use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_evolucao_meses.style.format({
+            "Entradas (R$)": "R$ {:,.2f}",
+            "Saídas (R$)": "R$ {:,.2f}",
+            "Saldo Projetado (R$)": "R$ {:,.2f}",
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
 
   botao_voltar()
 
@@ -1207,7 +1447,8 @@ elif st.session_state.pagina_atual == "💳 Cartão de Crédito":
     col_cc1, col_cc2 = st.columns(2)
     with col_cc1:
       nome_cartao = st.selectbox(
-          "Bandeira / Cartão", ["Itaúcard", "Samsung Itaú", "Nubank", "Outro"]
+          "Bandeira / Cartão",
+          ["Caixa", "Banco do Brasil", "Santander", "Inter", "Itaúcard", "Samsung Itaú", "Nubank", "Outro"]
       )
       desc_cc = st.text_input("Descrição da Compra Específica")
     with col_cc2:
@@ -1411,7 +1652,7 @@ elif st.session_state.pagina_atual == "🎯 Desafios":
   with col_esq:
     st.write("### Tabela Geral do Desafio")
     df_exibicao = pd.DataFrame()
-    df_exibicao["Nº do Depósito"] = df_deps["numero_deposito"]
+    df_exibicao["Nº do Depósito"] = df_deps["numero_depósito"]
     df_exibicao["Valor a Guardar"] = df_deps["valor"].apply(
         lambda x: f"R$ {x:,.2f}"
     )
@@ -1424,7 +1665,7 @@ elif st.session_state.pagina_atual == "🎯 Desafios":
     st.write("### ⚙️ Atualizar Status do Depósito")
     with st.form("form_atualizar_deposito_completo"):
       deps_sel = st.multiselect(
-          "Selecione os Números dos Depósitos:", df_deps["numero_deposito"].tolist()
+          "Selecione os Números dos Depósitos:", df_deps["numero_depósito"].tolist()
       )
       status_novo = st.selectbox(
           "Novo Status:", ["Pendente", "Concluído"], index=1
@@ -1534,8 +1775,7 @@ elif st.session_state.pagina_atual == "🎯 Metas de Gastos":
 elif st.session_state.pagina_atual == "🏷️ Categorias & Ícones":
   st.subheader("🏷️ Gerenciamento de Categorias Personalizadas & Ícones")
   st.write(
-      "Cadastre novas categorias customizadas para o seu ecossistema"
-      " financeiro."
+      "Cadastre novas categorias customizadas, edite ou exclua as existentes."
   )
 
   col_m1, col_m2 = st.columns(2)
@@ -1546,14 +1786,11 @@ elif st.session_state.pagina_atual == "🏷️ Categorias & Ícones":
       icone_escolhido = st.selectbox(
           "Escolha um Ícone Personalizado:",
           [
-              # --- Contas, Boletos & Finanças ---
               "📄", "🧾", "💳", "💰", "💵", "💸", "🏦", "🏧", "📊", 
               "🪙", "🏷️", "💼", "📈", "📉", "🔒", "🔑", "💡", "⚡", "💧", 
               "🔥", "📶", "📡", "📱", "💻", "📺", "📬", "🗑️", "⚙️", "🛠️",
-              # --- Despesas do Dia a Dia & Moradia ---
               "🏠", "🏡", "🏢", "🛒", "🛍️", "🍔", "🍕", "☕", "🍺", "🍷", 
               "🚗", "🚕", "🚌", "🚆", "⛽", "🅿️", "💊", "🏥", "🩺", "🏋️‍♂️", 
-              # --- Lazer, Pets & Outros ---
               "✈️", "🏖️", "🏨", "🐕", "🐈", "🐾", "🎮", "🎲", "📚", "🎧", 
               "🎬", "🎨", "🎁", "💄", "👕", "👟", "🎓", "👶", "🎉", "⭐"
           ],
@@ -1570,26 +1807,76 @@ elif st.session_state.pagina_atual == "🏷️ Categorias & Ícones":
           st.success(f"Categoria '{categoria_final}' criada com sucesso!")
           st.rerun()
         else:
-          st.error("Digite um nome válido para a categoria.")
+          st.error("Digite um nome válido para la categoria.")
 
   with col_m2:
-    st.write("### 🗑️ Excluir Categoria Personalizada")
-    df_cats_excluir = pd.read_sql("SELECT * FROM categorias", conn)
-    if not df_cats_excluir.empty:
-      with st.form("form_excluir_cat_completo"):
-        cat_para_deletar = st.selectbox(
-            "Selecione a categoria para apagar:",
-            df_cats_excluir["nome"].tolist(),
+    st.write("### ✏️ Editar ou 🗑️ Excluir Categoria")
+    df_cats_gerenciar = pd.read_sql("SELECT * FROM categorias", conn)
+    if not df_cats_gerenciar.empty:
+      lista_nomes_cats = df_cats_gerenciar["nome"].tolist()
+      
+      cat_selecionada_para_gerenciar = st.selectbox(
+          "Selecione a categoria para gerenciar:",
+          lista_nomes_cats,
+          key="sel_cat_gerenciar"
+      )
+      
+      id_cat_atual = df_cats_gerenciar[df_cats_gerenciar["nome"] == cat_selecionada_para_gerenciar]["id"].values[0]
+      nome_completo_atual = str(cat_selecionada_para_gerenciar).strip()
+      
+      match_emoji = re.match(r"^([^\w\s])\s*(.*)$", nome_completo_atual)
+      if match_emoji:
+        emoji_atual = match_emoji.group(1)
+        texto_atual_puro = match_emoji.group(2)
+      else:
+        partes_cat = nome_completo_atual.split(" ", 1)
+        emoji_atual = partes_cat[0] if len(partes_cat) > 0 else "📄"
+        texto_atual_puro = partes_cat[1] if len(partes_cat) > 1 else nome_completo_atual
+
+      lista_icones_opcoes = [
+          "📄", "🧾", "💳", "💰", "💵", "💸", "🏦", "🏧", "📊", 
+          "🪙", "🏷️", "💼", "📈", "📉", "🔒", "🔑", "💡", "⚡", "💧", 
+          "🔥", "📶", "📡", "📱", "💻", "📺", "📬", "🗑️", "⚙️", "🛠️",
+          "🏠", "🏡", "🏢", "🛒", "🛍️", "🍔", "🍕", "☕", "🍺", "🍷", 
+          "🚗", "🚕", "🚌", "🚆", "⛽", "🅿️", "💊", "🏥", "🩺", "🏋️‍♂️", 
+          "✈️", "🏖️", "🏨", "🐕", "🐈", "🐾", "🎮", "🎲", "📚", "🎧", 
+          "🎬", "🎨", "🎁", "💄", "👕", "👟", "🎓", "👶", "🎉", "⭐"
+      ]
+
+      idx_emoji_default = lista_icones_opcoes.index(emoji_atual) if emoji_atual in lista_icones_opcoes else 0
+      chave_form_edicao = f"form_edit_cat_{id_cat_atual}"
+
+      with st.form(chave_form_edicao):
+        st.write(f"Editando: **{cat_selecionada_para_gerenciar}**")
+        novo_icone = st.selectbox(
+            "Novo Ícone:",
+            lista_icones_opcoes,
+            index=idx_emoji_default,
+            key=f"novo_icone_sel_{id_cat_atual}"
         )
-        if st.form_submit_button(
-            "Excluir Categoria Selecionada", use_container_width=True
-        ):
-          c.execute("DELETE FROM categorias WHERE nome = ?", (cat_para_deletar,))
+        novo_nome_texto = st.text_input("Novo Nome da Categoria:", value=texto_atual_puro, key=f"novo_nome_texto_input_{id_cat_atual}")
+
+        col_btn_ed1, col_btn_ed2 = st.columns(2)
+        with col_btn_ed1:
+          btn_atualizar = st.form_submit_button("Atualizar Categoria", use_container_width=True)
+        with col_btn_ed2:
+          btn_excluir = st.form_submit_button("Excluir Categoria", use_container_width=True)
+
+        if btn_atualizar:
+          texto_base = novo_nome_texto.strip() if novo_nome_texto.strip() else texto_atual_puro
+          nome_atualizado_final = f"{novo_icone} {texto_base}"
+          c.execute("UPDATE categorias SET nome = ? WHERE id = ?", (nome_atualizado_final, int(id_cat_atual)))
           conn.commit()
-          st.success(f"Categoria '{cat_para_deletar}' excluída com sucesso!")
+          st.success(f"Categoria atualizada para '{nome_atualizado_final}' com sucesso!")
+          st.rerun()
+
+        if btn_excluir:
+          c.execute("DELETE FROM categorias WHERE id = ?", (int(id_cat_atual),))
+          conn.commit()
+          st.success(f"Categoria '{cat_selecionada_para_gerenciar}' excluída com sucesso!")
           st.rerun()
     else:
-      st.info("Nenhuma categoria personalizada cadastrada para exclusão.")
+      st.info("Nenhuma categoria personalizada cadastrada para gerenciar.")
 
   st.markdown("---")
   st.subheader("📋 Relação de Categorias Personalizadas Cadastradas")
@@ -1707,71 +1994,417 @@ elif st.session_state.pagina_atual == "❤️ Saúde Financeira":
   botao_voltar()
 
 # ==========================================
-# --- SEÇÃO 10: CONTAS A PAGAR ---
+# --- SEÇÃO 10: CONTAS A PAGAR & RECEBER ---
 # ==========================================
 elif st.session_state.pagina_atual == "📅 Contas a Pagar":
-  st.subheader("📅 Calendário de Contas a Vencer & Gestão de Pagamentos")
-  st.write(
-      "Organize boletos, contas fixas, IPVA e compromissos com vencimento"
-      " programado."
+  
+  if "data_calendario_ref" not in st.session_state or not isinstance(st.session_state.data_calendario_ref, (date, datetime)):
+    st.session_state.data_calendario_ref = date.today()
+
+  st.subheader("📅 Contas a Pagar & Receber / Gestão de Pagamentos")
+  st.write("Organize boletos, contas a pagar, contas a receber e compromissos com vencimento programado.")
+
+  st.markdown("##### 🗓️ Seleção de Data no Calendário Interativo")
+  data_calendario_topo = st.date_input(
+      "Selecionar Data de Referência:",
+      value=st.session_state.data_calendario_ref,
+      key="data_calendario_ref_input"
   )
+  if data_calendario_topo:
+    st.session_state.data_calendario_ref = data_calendario_topo
 
-  with st.form("form_conta_pagar_completo", clear_on_submit=True):
-    col_c1, col_c2 = st.columns(2)
-    with col_c1:
-      venc = st.date_input("Data de Vencimento da Conta")
-      nome_conta = st.text_input(
-          "Nome / Descrição da Conta (Ex: Conta de Luz, Seguro Auto)"
-      )
-    with col_c2:
-      val_conta = st.number_input(
-          "Valor Estimado ou Exato (R$)", min_value=0.0, format="%.2f"
-      )
+  if "aba_contas_ativa" not in st.session_state:
+    st.session_state.aba_contas_ativa = "pagar"
 
-    if st.form_submit_button("Adicionar Conta ao Calendário", use_container_width=True):
-      if nome_conta.strip() and val_conta > 0:
-        c.execute(
-            "INSERT INTO contas (vencimento, descricao, valor, pago) VALUES"
-            " (?,?,?,?)",
-            (venc.strftime("%Y-%m-%d"), str(nome_conta).strip(), val_conta, 0),
-        )
-        conn.commit()
-        st.success("Conta cadastrada no calendário com sucesso!")
-        st.rerun()
-      else:
-        st.error("Informe a descrição e o valor da conta.")
+  col_tab_btn1, col_tab_btn2, _ = st.columns([1, 1, 4])
+  with col_tab_btn1:
+    if st.button("📉 Contas a Pagar", use_container_width=True, type="primary" if st.session_state.aba_contas_ativa == "pagar" else "secondary"):
+      st.session_state.aba_contas_ativa = "pagar"
+      st.rerun()
+  with col_tab_btn2:
+    if st.button("📈 Contas a Receber", use_container_width=True, type="primary" if st.session_state.aba_contas_ativa == "receber" else "secondary"):
+      st.session_state.aba_contas_ativa = "receber"
+      st.rerun()
 
   st.markdown("---")
 
-  st.write("### 🔍 Pesquisa Inteligente de Contas (com Similaridade)")
-  termo_busca_contas = st.text_input(
-      "Digite o nome ou descrição da conta:", "", key="busca_contas_input"
+  st.markdown(
+      f"""
+      <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 14px; padding: 20px; margin-bottom: 25px;">
+          <h4 style="color: #60a5fa; margin-top: 0; display: flex; align-items: center; gap: 8px;">📌 Agenda do Dia: {st.session_state.data_calendario_ref.strftime('%d/%m/%Y')}</h4>
+      </div>
+      """,
+      unsafe_allow_html=True,
   )
 
-  df_contas_all = pd.read_sql("SELECT * FROM contas", conn)
+  data_sel_str = st.session_state.data_calendario_ref.strftime("%Y-%m-%d")
+  df_cp_dia = pd.read_sql("SELECT * FROM contas WHERE vencimento = ?", conn, params=(data_sel_str,))
+  df_cr_dia = pd.read_sql("SELECT * FROM contas_receber WHERE vencimento = ?", conn, params=(data_sel_str,))
 
-  if termo_busca_contas.strip() and not df_contas_all.empty:
-    termo_limpo = termo_busca_contas.strip().lower()
-    descricoes = df_contas_all["descricao"].tolist()
-    similares = difflib.get_close_matches(
-        termo_limpo, [d.lower() for d in descricoes], n=10, cutoff=0.3
-    )
+  col_agd1, col_agd2 = st.columns(2)
+  with col_agd1:
+    st.write("**📉 Contas a Pagar na Data:**")
+    if not df_cp_dia.empty:
+      for _, row_cp_d in df_cp_dia.iterrows():
+        st.markdown(f"• ID {row_cp_d['id']} | **{row_cp_d['descricao']}** — R$ {row_cp_d['valor']:,.2f} ({'Pago ✅' if row_cp_d['pago'] == 1 else 'Pendente ⏳'})")
+    else:
+      st.info("Nenhuma conta a pagar para esta data.")
 
-    mask = (
-        df_contas_all["descricao"]
-        .str.lower()
-        .str.contains(termo_limpo, na=False)
-        | df_contas_all["descricao"].str.lower().isin(similares)
-    )
-    contas_filtradas = df_contas_all[mask]
+  with col_agd2:
+    st.write("**📈 Contas a Receber na Data:**")
+    if not df_cr_dia.empty:
+      for _, row_cr_d in df_cr_dia.iterrows():
+        st.markdown(f"• ID {row_cr_d['id']} | **{row_cr_d['descricao']}** — R$ {row_cr_d['valor']:,.2f} ({'Recebido ✅' if row_cr_d['recebido'] == 1 else 'Pendente ⏳'})")
+    else:
+      st.info("Nenhuma conta a receber para esta data.")
+
+  st.markdown("---")
+
+  if st.session_state.aba_contas_ativa == "pagar":
+    st.subheader("➕ Nova Conta a Pagar (com Opção de Recorrência Mensal, Semanal ou Replicar datas)")
+    with st.form("form_conta_pagar_completo", clear_on_submit=True):
+      col_c1, col_c2 = st.columns(2)
+      with col_c1:
+        venc = st.date_input("Data de Vencimento Inicial", value=date.today(), key="venc_cp")
+        nome_conta = st.text_input(
+            "Nome / Descrição da Conta (Ex: Conta de Luz, Aluguel)"
+        )
+      with col_c2:
+        val_conta = st.number_input(
+            "Valor da Conta (R$)", min_value=0.0, format="%.2f", key="val_cp"
+        )
+        tipo_recorrencia = st.selectbox(
+            "Tipo de Recorrência / Lançamento:",
+            ["Apenas esta data (Sem recorrência)", "Recorrência Semanal (próximas 4 semanas)", "Recorrência Mensal (próximos 12 meses)", "Replicar datas específicas customizadas"],
+            key="recorrencia_cp"
+        )
+
+      replicar_datas_cp = []
+      if tipo_recorrencia == "Replicar datas específicas customizadas":
+        replicar_datas_cp = st.multiselect(
+            "Selecione as datas adicionais de vencimento:",
+            options=[date.today() + timedelta(days=d) for d in range(1, 365)],
+            format_func=lambda x: x.strftime("%d/%m/%Y"),
+            key="rep_datas_cp"
+        )
+
+      if st.form_submit_button("Adicionar Conta(s) a Pagar", use_container_width=True):
+        if nome_conta.strip() and val_conta > 0:
+          datas_para_inserir = [venc]
+          
+          if tipo_recorrencia == "Recorrência Semanal (próximas 4 semanas)":
+            for i in range(1, 5):
+              datas_para_inserir.append(venc + timedelta(weeks=i))
+          elif tipo_recorrencia == "Recorrência Mensal (próximos 12 meses)":
+            for i in range(1, 13):
+              ano_m = venc.year + (venc.month - 1 + i) // 12
+              mes_m = (venc.month - 1 + i) % 12 + 1
+              dia_m = min(venc.day, 28)
+              datas_para_inserir.append(date(ano_m, mes_m, dia_m))
+          elif tipo_recorrencia == "Replicar datas específicas customizadas":
+            for d_rep in replicar_datas_cp:
+              if d_rep not in datas_para_inserir:
+                datas_para_inserir.append(d_rep)
+
+          for d_ins in datas_para_inserir:
+            c.execute(
+                "INSERT INTO contas (vencimento, descricao, valor, pago) VALUES (?,?,?,?)",
+                (d_ins.strftime("%Y-%m-%d"), str(nome_conta).strip(), val_conta, 0),
+            )
+          conn.commit()
+          st.success(f"{len(datas_para_inserir)} conta(s) a pagar cadastrada(s) com sucesso!")
+          st.rerun()
+        else:
+          st.error("Informe a descrição e o valor da conta.")
+
+    st.markdown("---")
+
+    df_contas_alerta = pd.read_sql("SELECT * FROM contas WHERE pago = 0", conn)
+    if not df_contas_alerta.empty:
+      hoje = date.today()
+      df_contas_alerta["venc_dt"] = pd.to_datetime(df_contas_alerta["vencimento"]).dt.date
+      
+      vencidas = df_contas_alerta[df_contas_alerta["venc_dt"] < hoje]
+      vencem_hoje = df_contas_alerta[df_contas_alerta["venc_dt"] == hoje]
+
+      if not vencidas.empty or not vencem_hoje.empty:
+        st.markdown("### 🚨 Alertas de Vencimento (Pagar)")
+        if not vencidas.empty:
+          for _, r_venc in vencidas.iterrows():
+            st.error(f"⚠️ **Conta Vencida:** '{r_venc['descricao']}' vencia em **{pd.to_datetime(r_venc['vencimento']).strftime('%d/%m/%Y')}** no valor de **R$ {r_venc['valor']:,.2f}**!")
+        if not vencem_hoje.empty:
+          for _, r_hoje in vencem_hoje.iterrows():
+            st.warning(f"🔔 **Vence Hoje:** '{r_hoje['descricao']}' vence **hoje** ({hoje.strftime('%d/%m/%Y')}) no valor de **R$ {r_hoje['valor']:,.2f}**!")
+        st.markdown("---")
+
+    st.subheader("🔍 Pesquisa Aprimorada & Relação de Contas a Pagar")
+    
+    col_pesq_cp, col_fil_agenda_cp = st.columns([3, 2])
+    with col_pesq_cp:
+      termo_busca_contas = st.text_input(
+          "Pesquisar por nome, parte da descrição ou similaridade:", "", key="busca_contas_input"
+      )
+    with col_fil_agenda_cp:
+      usar_filtro_agenda_cp = st.checkbox("Filtrar visualização pela data selecionada no calendário do topo", value=False)
+
+    df_contas_all = pd.read_sql("SELECT * FROM contas", conn)
+
+    if not df_contas_all.empty:
+      if usar_filtro_agenda_cp:
+        df_contas_all["venc_dt_cmp"] = pd.to_datetime(df_contas_all["vencimento"]).dt.date
+        df_contas_all = df_contas_all[df_contas_all["venc_dt_cmp"] == st.session_state.data_calendario_ref]
+
+      if termo_busca_contas.strip():
+        termo_limpo = termo_busca_contas.strip().lower()
+        descricoes = df_contas_all["descricao"].tolist()
+        similares = difflib.get_close_matches(
+            termo_limpo, [d.lower() for d in descricoes], n=15, cutoff=0.25
+        )
+
+        mask = (
+            df_contas_all["descricao"]
+            .str.lower()
+            .str.contains(termo_limpo, na=False)
+            | df_contas_all["descricao"].str.lower().isin(similares)
+        )
+        contas_filtradas = df_contas_all[mask]
+      else:
+        contas_filtradas = df_contas_all
+    else:
+      contas_filtradas = df_contas_all
+
+    if not contas_filtradas.empty:
+      st.write("### 📋 Lista de Contas a Pagar")
+      for _, row_cp in contas_filtradas.iterrows():
+        c_id = row_cp["id"]
+        c_venc = pd.to_datetime(row_cp["vencimento"]).strftime("%d/%m/%Y")
+        c_desc = row_cp["descricao"]
+        c_val = row_cp["valor"]
+        c_pago = row_cp["pago"]
+
+        col_row1, col_row2, col_row3, col_row4, col_row5, col_row6 = st.columns([1, 2, 2, 1, 1, 1])
+        with col_row1:
+          st.write(f"**ID:** {c_id}")
+        with col_row2:
+          st.write(f"📅 {c_venc} | **{c_desc}**")
+        with col_row3:
+          st.write(f"R$ {c_val:,.2f} ({'Pago ✅' if c_pago == 1 else 'Pendente ⏳'})")
+        with col_row4:
+          if c_pago == 0:
+            if st.button("Pagar 💳", key=f"btn_pagar_{c_id}", use_container_width=True):
+              c.execute("UPDATE contas SET pago = 1 WHERE id = ?", (c_id,))
+              c.execute(
+                  "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
+                  (date.today().strftime("%Y-%m-%d"), "Despesa", f"Pgto: {c_desc}", "🏠 Contas Fixas (Necessidade)", c_val, "Manual")
+              )
+              conn.commit()
+              st.success(f"Conta '{c_desc}' paga com sucesso!")
+              st.rerun()
+          else:
+            if st.button("Estornar 🔄", key=f"btn_estornar_{c_id}", use_container_width=True):
+              c.execute("UPDATE contas SET pago = 0 WHERE id = ?", (c_id,))
+              conn.commit()
+              st.success(f"Conta '{c_desc}' marcada como pendente!")
+              st.rerun()
+        with col_row5:
+          if st.button("✏️ Editar", key=f"btn_edit_cp_{c_id}", use_container_width=True):
+            st.session_state[f"editando_cp_{c_id}"] = not st.session_state.get(f"editando_cp_{c_id}", False)
+            st.rerun()
+        with col_row6:
+          if st.button("Excluir 🗑️", key=f"btn_del_cp_{c_id}", use_container_width=True):
+            c.execute("DELETE FROM contas WHERE id = ?", (c_id,))
+            conn.commit()
+            st.success(f"Conta ID {c_id} excluída com sucesso!")
+            st.rerun()
+
+        if st.session_state.get(f"editando_cp_{c_id}", False):
+          with st.form(f"form_editar_cp_{c_id}"):
+            st.write(f"**Editando Conta ID {c_id}** (Ajuste de variação de valor ou data)")
+            novo_venc_cp = st.date_input("Nova Data de Vencimento", value=datetime.strptime(row_cp["vencimento"], "%Y-%m-%d").date(), key=f"nv_v_{c_id}")
+            nova_desc_cp = st.text_input("Nova Descrição", value=c_desc, key=f"nv_d_{c_id}")
+            novo_val_cp = st.number_input("Novo Valor (R$)", min_value=0.0, value=float(c_val), step=1.0, format="%.2f", key=f"nv_val_{c_id}")
+            
+            if st.form_submit_button("Salvar Alterações", use_container_width=True):
+              c.execute("UPDATE contas SET vencimento = ?, descricao = ?, valor = ? WHERE id = ?", 
+                        (novo_venc_cp.strftime("%Y-%m-%d"), nova_desc_cp.strip(), novo_val_cp, c_id))
+              conn.commit()
+              st.session_state[f"editando_cp_{c_id}"] = False
+              st.success("Conta atualizada com sucesso!")
+              st.rerun()
+
+      st.markdown("---")
+      id_del_cp = st.selectbox("Selecione o ID da conta a pagar para exclusão geral:", contas_filtradas["id"].tolist(), key="del_cp_sel")
+      if st.button("Excluir Conta a Pagar Selecionada", use_container_width=True):
+        c.execute("DELETE FROM contas WHERE id = ?", (id_del_cp,))
+        conn.commit()
+        st.success("Conta a pagar removida com sucesso!")
+        st.rerun()
+    else:
+      st.info("Nenhuma conta a pagar encontrada.")
+
   else:
-    contas_filtradas = df_contas_all
+    st.subheader("➕ Nova Conta a Receber (com Opção de Recorrência Mensal, Semanal ou Replicar datas)")
+    with st.form("form_conta_receber_completo", clear_on_submit=True):
+      col_cr1, col_cr2 = st.columns(2)
+      with col_cr1:
+        venc_r = st.date_input("Data de Vencimento / Recebimento Inicial", value=date.today(), key="venc_cr")
+        nome_conta_r = st.text_input(
+            "Nome / Descrição da Receita (Ex: Aluguel a Receber, Prestação de Serviço)"
+        )
+      with col_cr2:
+        val_conta_r = st.number_input(
+            "Valor a Receber (R$)", min_value=0.0, format="%.2f", key="val_cr"
+        )
+        tipo_recorrencia_r = st.selectbox(
+            "Tipo de Recorrência / Lançamento:",
+            ["Apenas esta data (Sem recorrência)", "Recorrência Semanal (próximas 4 semanas)", "Recorrência Mensal (próximos 12 meses)", "Replicar datas específicas customizadas"],
+            key="recorrencia_cr"
+        )
 
-  if not contas_filtradas.empty:
-    st.write("### 📋 Relação de Compromissos (Resultados da Busca)")
-    st.dataframe(contas_filtradas, use_container_width=True)
-  else:
-    st.info("Nenhuma conta encontrada com o termo pesquisado.")
+      replicar_datas_cr = []
+      if tipo_recorrencia_r == "Replicar datas específicas customizadas":
+        replicar_datas_cr = st.multiselect(
+            "Selecione as datas adicionais de vencimento:",
+            options=[date.today() + timedelta(days=d) for d in range(1, 365)],
+            format_func=lambda x: x.strftime("%d/%m/%Y"),
+            key="rep_datas_cr"
+        )
+
+      if st.form_submit_button("Adicionar Conta(s) a Receber", use_container_width=True):
+        if nome_conta_r.strip() and val_conta_r > 0:
+          datas_para_inserir_r = [venc_r]
+          
+          if tipo_recorrencia_r == "Recorrência Semanal (próximas 4 semanas)":
+            for i in range(1, 5):
+              datas_para_inserir_r.append(venc_r + timedelta(weeks=i))
+          elif tipo_recorrencia_r == "Recorrência Mensal (próximos 12 meses)":
+            for i in range(1, 13):
+              ano_m = venc_r.year + (venc_r.month - 1 + i) // 12
+              mes_m = (venc_r.month - 1 + i) % 12 + 1
+              dia_m = min(venc_r.day, 28)
+              datas_para_inserir_r.append(date(ano_m, mes_m, dia_m))
+          elif tipo_recorrencia_r == "Replicar datas específicas customizadas":
+            for d_rep_r in replicar_datas_cr:
+              if d_rep_r not in datas_para_inserir_r:
+                datas_para_inserir_r.append(d_rep_r)
+
+          for d_ins_r in datas_para_inserir_r:
+            c.execute(
+                "INSERT INTO contas_receber (vencimento, descricao, valor, recebido) VALUES (?,?,?,?)",
+                (d_ins_r.strftime("%Y-%m-%d"), str(nome_conta_r).strip(), val_conta_r, 0),
+            )
+          conn.commit()
+          st.success(f"{len(datas_para_inserir_r)} conta(s) a receber cadastrada(s) com sucesso!")
+          st.rerun()
+        else:
+          st.error("Informe a descrição e o valor da conta a receber.")
+
+    st.markdown("---")
+    st.subheader("🔍 Pesquisa Aprimorada & Relação de Contas a Receber")
+    
+    col_pesq_cr, col_fil_agenda_cr = st.columns([3, 2])
+    with col_pesq_cr:
+      termo_busca_receber = st.text_input(
+          "Pesquisar por nome, parte da descrição ou similaridade:", "", key="busca_receber_input"
+      )
+    with col_fil_agenda_cr:
+      usar_filtro_agenda_cr = st.checkbox("Filtrar visualização pela data selecionada no calendário do topo", value=False, key="chk_agenda_cr")
+
+    df_receber_all = pd.read_sql("SELECT * FROM contas_receber", conn)
+
+    if not df_receber_all.empty:
+      if usar_filtro_agenda_cr:
+        df_receber_all["venc_dt_cmp"] = pd.to_datetime(df_receber_all["vencimento"]).dt.date
+        df_receber_all = df_receber_all[df_receber_all["venc_dt_cmp"] == st.session_state.data_calendario_ref]
+
+      if termo_busca_receber.strip():
+        termo_limpo_r = termo_busca_receber.strip().lower()
+        desc_r = df_receber_all["descricao"].tolist()
+        sim_r = difflib.get_close_matches(
+            termo_limpo_r, [d.lower() for d in desc_r], n=15, cutoff=0.25
+        )
+
+        mask_r = (
+            df_receber_all["descricao"]
+            .str.lower()
+            .str.contains(termo_limpo_r, na=False)
+            | df_receber_all["descricao"].str.lower().isin(sim_r)
+        )
+        receber_filtradas = df_receber_all[mask_r]
+      else:
+        receber_filtradas = df_receber_all
+    else:
+      receber_filtradas = df_receber_all
+
+    if not receber_filtradas.empty:
+      st.write("### 📋 Lista de Contas a Receber")
+      for _, row_cr in receber_filtradas.iterrows():
+        cr_id = row_cr["id"]
+        cr_venc = pd.to_datetime(row_cr["vencimento"]).strftime("%d/%m/%Y")
+        cr_desc = row_cr["descricao"]
+        cr_val = row_cr["valor"]
+        cr_recebido = row_cr["recebido"]
+
+        col_r1, col_r2, col_r3, col_r4, col_r5, col_r6 = st.columns([1, 2, 2, 1, 1, 1])
+        with col_r1:
+          st.write(f"**ID:** {cr_id}")
+        with col_r2:
+          st.write(f"📅 {cr_venc} | **{cr_desc}**")
+        with col_r3:
+          st.write(f"R$ {cr_val:,.2f} ({'Recebido ✅' if cr_recebido == 1 else 'Pendente ⏳'})")
+        with col_r4:
+          if cr_recebido == 0:
+            if st.button("Receber 💰", key=f"btn_receber_{cr_id}", use_container_width=True):
+              c.execute("UPDATE contas_receber SET recebido = 1 WHERE id = ?", (cr_id,))
+              c.execute(
+                  "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
+                  (date.today().strftime("%Y-%m-%d"), "Receita", f"Recebimento: {cr_desc}", "Freelance / Extra", cr_val, "Manual")
+              )
+              conn.commit()
+              st.success(f"Recebimento '{cr_desc}' confirmado com sucesso!")
+              st.rerun()
+          else:
+            if st.button("Estornar 🔄", key=f"btn_estornar_cr_{cr_id}", use_container_width=True):
+              c.execute("UPDATE contas_receber SET recebido = 0 WHERE id = ?", (cr_id,))
+              conn.commit()
+              st.success(f"Recebimento '{cr_desc}' marcado como pendente!")
+              st.rerun()
+        with col_r5:
+          if st.button("✏️ Editar", key=f"btn_edit_cr_{cr_id}", use_container_width=True):
+            st.session_state[f"editando_cr_{cr_id}"] = not st.session_state.get(f"editando_cr_{cr_id}", False)
+            st.rerun()
+        with col_r6:
+          if st.button("Excluir 🗑️", key=f"btn_del_cr_{cr_id}", use_container_width=True):
+            c.execute("DELETE FROM contas_receber WHERE id = ?", (cr_id,))
+            conn.commit()
+            st.success(f"Conta a receber ID {cr_id} excluída com sucesso!")
+            st.rerun()
+
+        if st.session_state.get(f"editando_cr_{cr_id}", False):
+          with st.form(f"form_editar_cr_{cr_id}"):
+            st.write(f"**Editando Conta a Receber ID {cr_id}** (Ajuste de variação)")
+            novo_venc_cr = st.date_input("Nova Data de Vencimento", value=datetime.strptime(row_cr["vencimento"], "%Y-%m-%d").date(), key=f"nv_vr_{cr_id}")
+            nova_desc_cr = st.text_input("Nova Descrição", value=cr_desc, key=f"nv_dr_{cr_id}")
+            novo_val_cr = st.number_input("Novo Valor (R$)", min_value=0.0, value=float(cr_val), step=1.0, format="%.2f", key=f"nv_valr_{cr_id}")
+            
+            if st.form_submit_button("Salvar Alterações", use_container_width=True):
+              c.execute("UPDATE contas_receber SET vencimento = ?, descricao = ?, valor = ? WHERE id = ?", 
+                        (novo_venc_cr.strftime("%Y-%m-%d"), nova_desc_cr.strip(), novo_val_cr, cr_id))
+              conn.commit()
+              st.session_state[f"editando_cr_{cr_id}"] = False
+              st.success("Conta a receber atualizada com sucesso!")
+              st.rerun()
+
+      st.markdown("---")
+      id_del_cr = st.selectbox("Selecione o ID da conta a receber para exclusão geral:", receber_filtradas["id"].tolist(), key="del_cr_sel")
+      if st.button("Excluir Conta a Receber Selecionada", use_container_width=True):
+        c.execute("DELETE FROM contas_receber WHERE id = ?", (id_del_cr,))
+        conn.commit()
+        st.success("Conta a receber removida com sucesso!")
+        st.rerun()
+    else:
+      st.info("Nenhuma conta a receber encontrada.")
+
   botao_voltar()
 
 # ==========================================
@@ -1820,6 +2453,7 @@ elif st.session_state.pagina_atual == "📋 Extrato & Backup":
       if senha_exclusao_geral == "1234":
         c.execute("DELETE FROM transacoes")
         c.execute("DELETE FROM contas")
+        c.execute("DELETE FROM contas_receber")
         c.execute("DELETE FROM cartao_credito")
         c.execute("DELETE FROM carteira_investimentos")
         c.execute("DELETE FROM veiculos")
@@ -1943,7 +2577,7 @@ elif st.session_state.pagina_atual == "📋 Extrato & Backup":
     else:
       st.info("Nenhuma transação válida lida no PDF atual para reconciliação.")
   else:
-    st.info("Faça o upload de um extrato bancário em PDF acima para habilitar o painel de Reconciliação Automatizada.")
+      st.info("Faça o upload de um extrato bancário em PDF acima para habilitar o painel de Reconciliação Automatizada.")
 
   st.markdown("---")
   st.subheader("🔍 Pesquisa Avançada & Filtros Inteligentes no Extrato")
@@ -1953,7 +2587,7 @@ elif st.session_state.pagina_atual == "📋 Extrato & Backup":
     termo_busca_extrato = st.text_input(
         "Filtrar por texto/similaridade (Descrição ou Categoria):",
         "",
-        key="filtro_extrato_similaridade",
+        key="fil_extrato_similaridade",
     )
   with col_s2:
     filtro_tipo = st.selectbox(
@@ -2232,7 +2866,7 @@ elif st.session_state.pagina_atual == "📄 Holerites":
         df_exibicao_hol.style.format({
             "salario_bruto": "R$ {:,.2f}",
             "vale": "R$ {:,.2f}",
-            "total_descontos": "R$ {:,.2f}",
+            "total_desconsos": "R$ {:,.2f}",
             "liquido": "R$ {:,.2f}",
             "inss": "R$ {:,.2f}",
             "irrf": "R$ {:,.2f}",
@@ -2271,7 +2905,7 @@ elif st.session_state.pagina_atual == "📄 Holerites":
       st.write("")
       st.write("")
       if st.button(
-          "🗑️ EXCLUIR TODO O HISTÓRICO DE HOLERITES",
+          "🗑️ EXCLUIR TODO HISTÓRICO DE HOLERITES",
           use_container_width=True,
           type="primary",
       ):
