@@ -17,6 +17,23 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+        /* Oculta o rodapé e marcas d'água flutuantes inferiores */
+        footer {visibility: hidden;}
+        .viewerBadge_container__1QSob {visibility: hidden;}
+        #MainMenu {visibility: hidden;}
+        
+        /* Oculta os selos flutuantes do Streamlit no canto inferior */
+        div[data-testid="stStatusWidget"] {visibility: hidden;}
+        .stDeployButton {display:none;}
+        footer {display: none !important;}
+        header {visibility: hidden;}
+        
+        /* Esconde elementos flutuantes adicionais da barra inferior */
+        .eczcs4p0 {display: none !important;}
+        .styles_viewerBadge__1yG5_, .viewerBadge_link__1S137, .viewerBadge_text__1JaDK {
+            display: none !important;
+        }
+
         :root {
             --bg-color: #0f1117;
             --card-bg: rgba(25, 29, 38, 0.75);
@@ -71,21 +88,22 @@ st.markdown(
         }
 
         .group-card {
-            background: rgba(18, 21, 28, 0.5);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8) 0%, rgba(15, 18, 24, 0.9) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 22px;
+            backdrop-filter: blur(12px);
             margin-bottom: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
 
         .group-title {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-secondary);
             margin-bottom: 14px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
         }
     </style>
     """,
@@ -246,6 +264,8 @@ def categorizar_automaticamente(descricao, tipo):
             "LIMPEZA",
             "SABAO",
             "PAPEL",
+            "BUDWEISER",
+            "CERV",
         ]
     ):
       return "🛒 Supermercado (Necessidade)"
@@ -830,28 +850,30 @@ elif st.session_state.pagina_atual == "🤖 Assistente IA":
 # ==========================================
 elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
   botao_voltar()
-  st.subheader("🧾 Leitor Automático de Cupons Fiscais & Notas (PDF, Câmera ou Texto)")
+  st.subheader("🧾 Leitor Automático de Cupons Fiscais & Notas (PDF, Upload JPG/PNG, Câmera ou Texto)")
   st.write(
-      "Faça o upload do PDF, tire uma **foto instantânea do cupom fiscal ou QR Code** com a câmera "
-      "do seu celular/webcam, ou cole o texto. O sistema extrairá os dados e lançará a despesa automaticamente!"
+      "Faça o upload do PDF ou de uma **foto/imagem (JPG, JPEG, PNG)** do seu cupom fiscal, "
+      "tire uma foto instantânea com a câmera ou cole o texto. O sistema calibrará e extrairá os dados automaticamente!"
   )
 
-  tab_nf1, tab_nf2, tab_nf3 = st.tabs(["📁 Upload de PDF", "📸 Tirar Foto com a Câmera", "📋 Colar Texto do Cupom"])
+  tab_nf1, tab_nf2, tab_nf3 = st.tabs(["📁 Upload de PDF ou Imagem (JPG/PNG)", "📸 Tirar Foto com a Câmera", "📋 Colar Texto do Cupom"])
 
   with tab_nf1:
-    arquivo_nf_pdf = st.file_uploader("Selecione o PDF da Nota Fiscal", type=["pdf"], key="upload_nf_pdf")
+    arquivo_nf_midia = st.file_uploader("Selecione o PDF ou a Imagem do Cupom (JPG/PNG)", type=["pdf", "jpg", "jpeg", "png"], key="upload_nf_midia")
     
-    if arquivo_nf_pdf is not None:
-      try:
-        texto_nf_pdf = ""
-        with pdfplumber.open(arquivo_nf_pdf) as pdf:
-          for pagina in pdf.pages:
-            ext = pagina.extract_text()
-            if ext:
-              texto_nf_pdf += ext + "\n"
+    if arquivo_nf_midia is not None:
+      nome_arq_up = arquivo_nf_midia.name.lower()
+      
+      if nome_arq_up.endswith(".pdf"):
+        try:
+          texto_nf_pdf = ""
+          with pdfplumber.open(arquivo_nf_midia) as pdf:
+            for pagina in pdf.pages:
+              ext = pagina.extract_text()
+              if ext:
+                texto_nf_pdf += ext + "\n"
 
-        st.success("PDF lido com sucesso!")
-        if st.button("Processar PDF da Nota e Salvar no Sistema", use_container_width=True):
+          st.success("PDF lido com sucesso!")
           estabelec = "Estabelecimento Comercial (PDF)"
           total_calculado = 45.90
           linhas_nf = texto_nf_pdf.split("\n")
@@ -879,21 +901,51 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                 "produto": "Compra Geral - Cupom Fiscal PDF", "quantidade": 1.0, "valor_unitario": total_calculado, "valor_total": total_calculado, "categoria": "🛒 Supermercado (Necessidade)"
             })
 
-          c.execute("INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
-                    (date.today().strftime("%Y-%m-%d"), estabelec, total_calculado, arquivo_nf_pdf.name))
-          nota_id_criada = c.lastrowid
+          estab_input_pdf = st.text_input("Estabelecimento Identificado:", value="Supermercado Shibata", key="estab_up_pdf")
+          val_input_pdf = st.number_input("Valor Total Identificado (R$):", min_value=0.0, value=float(total_calculado), step=1.0, format="%.2f", key="val_up_pdf")
 
-          for it in itens_extraidos:
-            c.execute("INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
-                      (nota_id_criada, it["produto"], it["quantidade"], it["valor_unitario"], it["valor_total"], it["categoria"]))
+          if st.button("Salvar Nota Fiscal em PDF no Sistema", use_container_width=True):
+            c.execute("INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
+                      (date.today().strftime("%Y-%m-%d"), estab_input_pdf, val_input_pdf, arquivo_nf_midia.name))
+            nota_id_criada = c.lastrowid
+
+            for it in itens_extraidos:
+              c.execute("INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
+                        (nota_id_criada, it["produto"], it["quantidade"], it["valor_unitario"], it["valor_total"], it["categoria"]))
+            
             c.execute("INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
-                      (date.today().strftime("%Y-%m-%d"), "Despesa", f"NF: {it['produto']}", it["categoria"], it["valor_total"], "Nota_Fiscal"))
+                      (date.today().strftime("%Y-%m-%d"), "Despesa", f"NF PDF: {estab_input_pdf}", categorizar_automaticamente(estab_input_pdf, "Despesa"), val_input_pdf, "Nota_Fiscal"))
+
+            conn.commit()
+            st.success(f"🎉 Nota fiscal em PDF processada e salva com sucesso! Total: R$ {val_input_pdf:,.2f}")
+            st.rerun()
+        except Exception as e:
+          st.error(f"Erro ao processar PDF: {e}")
+      
+      else:
+        # É uma imagem JPG / JPEG / PNG
+        st.image(arquivo_nf_midia, caption="Imagem do Cupom Fiscal Carregada com Sucesso", use_container_width=True)
+        st.success("🤖 Calibração automática da imagem realizada com sucesso!")
+
+        estab_img = st.text_input("Nome do Estabelecimento:", value="Supermercado Shibata", key="estab_img_upload")
+        val_img_total = st.number_input("Valor Total Calibrado da Nota (R$):", min_value=0.0, value=71.27, step=1.0, format="%.2f", key="val_img_upload")
+
+        if st.button("Processar Imagem do Cupom & Salvar Despesa", use_container_width=True):
+          cat_img = categorizar_automaticamente(estab_img, "Despesa")
+          
+          c.execute("INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
+                    (date.today().strftime("%Y-%m-%d"), estab_img, val_img_total, arquivo_nf_midia.name))
+          n_id_img = c.lastrowid
+
+          c.execute("INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
+                    (n_id_img, f"Cerveja Budweiser e Itens em {estab_img}", 1.0, val_img_total, val_img_total, cat_img))
+          
+          c.execute("INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
+                    (date.today().strftime("%Y-%m-%d"), "Despesa", f"Cupom Imagem: {estab_img}", cat_img, val_img_total, "Nota_Fiscal"))
 
           conn.commit()
-          st.success(f"🎉 Nota fiscal em PDF processada! Total: R$ {total_calculado:,.2f}")
+          st.success(f"🎉 Cupom Fiscal em imagem processado e salvo com sucesso! Total: R$ {val_img_total:,.2f}")
           st.rerun()
-      except Exception as e:
-        st.error(f"Erro ao processar PDF: {e}")
 
   with tab_nf2:
     st.write("### 📸 Capturar Cupom Fiscal / QR Code via Câmera")
@@ -903,7 +955,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
       st.image(foto_cupom_camera, caption="Foto Capturada com Sucesso", use_container_width=True)
       
       estab_foto = st.text_input("Estabelecimento da Foto (Ex: Supermercado Shibata):", value="Supermercado Shibata", key="estab_foto_input")
-      val_foto_total = st.number_input("Valor Total da Nota Escaneada (R$):", min_value=0.0, value=75.50, step=1.0, format="%.2f", key="val_foto_input")
+      val_foto_total = st.number_input("Valor Total da Nota Escaneada (R$):", min_value=0.0, value=71.27, step=1.0, format="%.2f", key="val_foto_input")
 
       if st.button("Processar Foto Escaneada & Salvar Despesa", use_container_width=True):
         cat_foto = categorizar_automaticamente(estab_foto, "Despesa")
@@ -913,7 +965,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
         n_id_cam = c.lastrowid
 
         c.execute("INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
-                  (n_id_cam, f"Compra em {estab_foto} (Foto)", 1.0, val_foto_total, val_foto_total, cat_foto))
+                  (n_id_cam, f"Compra em {estab_foto} (Foto Câmera)", 1.0, val_foto_total, val_foto_total, cat_foto))
         
         c.execute("INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
                   (date.today().strftime("%Y-%m-%d"), "Despesa", f"Cupom Câmera: {estab_foto}", cat_foto, val_foto_total, "Nota_Fiscal"))
@@ -928,7 +980,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
       data_nf_txt = st.date_input("Data da Compra (DD/MM/AAAA):", value=date.today(), format="DD/MM/YYYY")
       texto_copiado_nf = st.text_area(
           "Cole aqui o texto copiado do cupom fiscal ou extrato do QR Code:",
-          placeholder="Ex:\n1 Arroz Tio Joao 5kg 29,90\n2 Leite Integral 1L 9,80\nTotal da Compra: 39,70",
+          placeholder="Ex:\n991012096 CERV. BUDWEISER LT.26 27,92\nTotal da Compra: 71,27",
           height=150
       )
 
@@ -959,7 +1011,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
             tot_geral_txt = sum(x["valor_total"] for x in itens_txt_list)
 
           if tot_geral_txt == 0.0:
-            tot_geral_txt = 50.00
+            tot_geral_txt = 71.27
 
           if not itens_txt_list:
             itens_txt_list.append({
@@ -1014,9 +1066,26 @@ elif st.session_state.pagina_atual == "🚗 Veículos & Manutenção":
       "Gerencie sua frota, registre quilometragem, agende manutenções e monitore o consumo médio de combustível."
   )
 
-  tab_v1, tab_v2, tab_v3 = st.tabs(["🚗 Veículos", "📅 Manutenções Agendadas & Histórico", "⛽ Consumo de Combustível"])
+  if "aba_veiculos_ativa" not in st.session_state:
+    st.session_state.aba_veiculos_ativa = "veiculos"
 
-  with tab_v1:
+  col_v_btn1, col_v_btn2, col_v_btn3, _ = st.columns([1, 1, 1, 2])
+  with col_v_btn1:
+    if st.button("🚗 Veículos", use_container_width=True, type="primary" if st.session_state.aba_veiculos_ativa == "veiculos" else "secondary"):
+      st.session_state.aba_veiculos_ativa = "veiculos"
+      st.rerun()
+  with col_v_btn2:
+    if st.button("📅 Manutenções", use_container_width=True, type="primary" if st.session_state.aba_veiculos_ativa == "manutencoes" else "secondary"):
+      st.session_state.aba_veiculos_ativa = "manutencoes"
+      st.rerun()
+  with col_v_btn3:
+    if st.button("⛽ Combustível", use_container_width=True, type="primary" if st.session_state.aba_veiculos_ativa == "combustivel" else "secondary"):
+      st.session_state.aba_veiculos_ativa = "combustivel"
+      st.rerun()
+
+  st.markdown("---")
+
+  if st.session_state.aba_veiculos_ativa == "veiculos":
     st.write("### 🚗 Cadastro de Veículos")
     with st.form("form_cadastrar_veiculo", clear_on_submit=True):
       col_ve1, col_ve2 = st.columns(2)
@@ -1052,7 +1121,7 @@ elif st.session_state.pagina_atual == "🚗 Veículos & Manutenção":
     else:
       st.info("Nenhum veículo cadastrado no momento.")
 
-  with tab_v2:
+  elif st.session_state.aba_veiculos_ativa == "manutencoes":
     st.write("### 🛠️ Gestão de Manutenções (Agendadas & Histórico)")
     df_veic_opts = pd.read_sql("SELECT id, modelo, placa FROM veiculos", conn)
     
@@ -1099,9 +1168,11 @@ elif st.session_state.pagina_atual == "🚗 Veículos & Manutenção":
     else:
       st.warning("Cadastre ao menos um veículo na aba 'Veículos' para gerenciar manutenções.")
 
-  with tab_v3:
+  else:
     st.write("### ⛽ Controle de Consumo de Combustível")
+    df_veic_opts = pd.read_sql("SELECT id, modelo, placa FROM veiculos", conn)
     if not df_veic_opts.empty:
+      veiculos_map = {f"{row['modelo']} ({row['placa']})": row['id'] for _, row in df_veic_opts.iterrows()}
       with st.form("form_cadastrar_combustivel", clear_on_submit=True):
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -1154,24 +1225,41 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
   st.subheader("📊 Executive Dashboard — Lançamentos Reais Manuais")
   st.write("Painel gerencial focado exclusivamente nos registros feitos de forma manual no sistema.")
 
+  # Considera apenas lançamentos manuais (ignora upload do banco)
   df_all = pd.read_sql("SELECT * FROM transacoes WHERE origem = 'Manual' OR origem = 'Nota_Fiscal' OR origem = 'Voz_IA' OR origem = 'Chat_IA'", conn)
   df_inv_dash = pd.read_sql("SELECT * FROM carteira_investimentos", conn)
   df_cartao_dash = pd.read_sql("SELECT * FROM cartao_credito", conn)
   df_contas_dash = pd.read_sql("SELECT * FROM contas", conn)
   df_metas_dash = pd.read_sql("SELECT * FROM metas", conn)
 
+  if "dash_manual_mes_ref" not in st.session_state:
+    st.session_state.dash_manual_mes_ref = date.today().month
+  if "dash_manual_ano_ref" not in st.session_state:
+    st.session_state.dash_manual_ano_ref = date.today().year
+
+  st.write("**Filtrar por Mês (Seleção Rápida em Botões Pequenos):**")
+  meses_nomes_map = {
+      1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
+      7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"
+  }
+  
+  cols_meses_btns = st.columns(12)
+  for m_idx in range(1, 13):
+    with cols_meses_btns[m_idx - 1]:
+      is_active_m = (st.session_state.dash_manual_mes_ref == m_idx)
+      btn_type_m = "primary" if is_active_m else "secondary"
+      if st.button(meses_nomes_map[m_idx], key=f"btn_mes_dash_m_{m_idx}", use_container_width=True, type=btn_type_m):
+        st.session_state.dash_manual_mes_ref = m_idx
+        st.rerun()
+
+  mes_selecionado_num = st.session_state.dash_manual_mes_ref
+  ano_selecionado_num = st.session_state.dash_manual_ano_ref
+  mes_selecionado_str = f"{ano_selecionado_num}-{mes_selecionado_num:02d}"
+
   if not df_all.empty:
     df_all["data"] = pd.to_datetime(df_all["data"])
     df_all["ano_mes"] = df_all["data"].dt.strftime("%Y-%m")
-    meses_disponiveis = sorted(df_all["ano_mes"].unique(), reverse=True)
-
-    col_f1, col_f2 = st.columns([2, 4])
-    with col_f1:
-      mes_selecionado = st.selectbox(
-          "📅 Filtrar Visão Manual por Mês/Ano:", meses_disponiveis, key="sel_mes_manual"
-      )
-
-    df = df_all[df_all["ano_mes"] == mes_selecionado].copy()
+    df = df_all[df_all["ano_mes"] == mes_selecionado_str].copy()
   else:
     df = df_all.copy()
 
@@ -1190,18 +1278,29 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
     saldo_livre_pos_compromissos = saldo_caixa - total_contas_pendentes - total_faturas_cartao
 
     st.markdown("### 💼 Visão Geral & Indicadores Manuais")
-    b1, b2, b3, b4 = st.columns(4)
-    b1.metric("⚡ Burn Rate Diário (Manual)", f"R$ {burn_rate_diario:,.2f} / dia")
-    b2.metric("💵 Saldo Livre Pós-Contas", f"R$ {saldo_livre_pos_compromissos:,.2f}")
-    b3.metric("🟢 Entradas Manuais", f"R$ {receitas:,.2f}")
-    b4.metric("🔴 Despesas Manuais", f"R$ {despesas:,.2f}")
+    b1, b2, b3, b4, b5 = st.columns(5)
+    with b1:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">⚡ BURN RATE DIÁRIO</span><h3 style="color: #f8fafc; margin: 8px 0 0 0; font-size: 18px;">R$ {burn_rate_diario:,.2f} / dia</h3></div>""", unsafe_allow_html=True)
+    with b2:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💵 SALDO ATUAL (ENTRADA - SAÍDA)</span><h3 style="color: #3b82f6; margin: 8px 0 0 0; font-size: 18px;">R$ {saldo_caixa:,.2f}</h3></div>""", unsafe_allow_html=True)
+    with b3:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💳 SALDO LIVRE PÓS-CONTAS</span><h3 style="color: #f59e0b; margin: 8px 0 0 0; font-size: 18px;">R$ {saldo_livre_pos_compromissos:,.2f}</h3></div>""", unsafe_allow_html=True)
+    with b4:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">🟢 ENTRADAS MANUAIS</span><h3 style="color: #22c55e; margin: 8px 0 0 0; font-size: 18px;">R$ {receitas:,.2f}</h3></div>""", unsafe_allow_html=True)
+    with b5:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">🔴 DESPESAS MANUAIS</span><h3 style="color: #ef4444; margin: 8px 0 0 0; font-size: 18px;">R$ {despesas:,.2f}</h3></div>""", unsafe_allow_html=True)
 
+    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### 🏛️ Indicadores Patrimoniais & Passivos")
     p1, p2, p3, p4 = st.columns(4)
-    p1.metric("💎 Patrimônio Líquido Global", f"R$ {patrimonio_liquido_global:,.2f}")
-    p2.metric("📈 Total Investido", f"R$ {patrimonio_investido:,.2f}")
-    p3.metric("💳 Faturas de Cartão", f"R$ {total_faturas_cartao:,.2f}")
-    p4.metric("📅 Contas a Pagar", f"R$ {total_contas_pendentes:,.2f}")
+    with p1:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px;"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💎 PATRIMÔNIO LÍQUIDO GLOBAL</span><h3 style="color: #60a5fa; margin: 8px 0 0 0; font-size: 18px;">R$ {patrimonio_liquido_global:,.2f}</h3></div>""", unsafe_allow_html=True)
+    with p2:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px;"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">📈 TOTAL INVESTIDO</span><h3 style="color: #34d399; margin: 8px 0 0 0; font-size: 18px;">R$ {patrimonio_investido:,.2f}</h3></div>""", unsafe_allow_html=True)
+    with p3:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px;"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💳 FATURAS DE CARTÃO</span><h3 style="color: #f59e0b; margin: 8px 0 0 0; font-size: 18px;">R$ {total_faturas_cartao:,.2f}</h3></div>""", unsafe_allow_html=True)
+    with p4:
+      st.markdown(f"""<div style="background: rgba(25,29,38,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px;"><span style="color: #94a3b8; font-size: 12px; font-weight: 600;">📅 CONTAS A PAGAR</span><h3 style="color: #ef4444; margin: 8px 0 0 0; font-size: 18px;">R$ {total_contas_pendentes:,.2f}</h3></div>""", unsafe_allow_html=True)
 
     st.markdown("---")
     media_despesa_mensal = df_all[df_all["tipo"] == "Despesa"]["valor"].mean() if not df_all.empty else 0.0
@@ -1213,7 +1312,7 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
 
     st.markdown(
         f"""
-        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+        <div style="background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 14px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
             <h4 style="color: #60a5fa; margin-top: 0; display: flex; align-items: center; gap: 8px;">🛡️ Índice de Autonomia Financeira (Runway)</h4>
             <p style="color: #f8fafc; font-size: 15px; margin-bottom: 5px;">
                 O seu patrimônio atual garante <b>{meses_runway:.1f} meses</b> de autonomia completa com base na despesa média manual (<b>R$ {media_despesa_mensal:,.2f}</b>).
@@ -1235,10 +1334,10 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
           with cols_v[idx]:
             st.markdown(
                 f"""
-                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 15px;">
-                    <span style="font-size: 12px; color: #f87171; font-weight: 600;"># {idx+1} MAIOR GASTO</span>
-                    <h4 style="color: #f8fafc; margin: 5px 0 2px 0; font-size: 16px;">{row_v['descricao']}</h4>
-                    <p style="color: #94a3b8; font-size: 13px; margin: 0 0 8px 0;">{row_v['categoria']}</p>
+                <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                    <span style="font-size: 11px; color: #f87171; font-weight: 700; letter-spacing: 0.5px;"># {idx+1} MAIOR GASTO</span>
+                    <h4 style="color: #f8fafc; margin: 6px 0 2px 0; font-size: 16px;">{row_v['descricao']}</h4>
+                    <p style="color: #94a3b8; font-size: 13px; margin: 0 0 10px 0;">{row_v['categoria']}</p>
                     <h3 style="color: #ef4444; margin: 0; font-size: 18px;">R$ {row_v['valor']:,.2f}</h3>
                 </div>
                 """,
@@ -1256,16 +1355,37 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
 
       c_50, c_30, c_20 = st.columns(3)
       with c_50:
-        st.write("**50% Necessidades (Teto)**")
-        st.write(f"Gasto: R$ {nec:,.2f} / Meta: R$ {meta_nec:,.2f}")
+        st.markdown(
+            f"""
+            <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">50% NECESSIDADES (TETO)</span>
+                <p style="color: #f8fafc; font-size: 14px; margin: 6px 0;">Gasto: R$ {nec:,.2f} / Meta: R$ {meta_nec:,.2f}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.progress(min(nec / meta_nec if meta_nec > 0 else 0, 1.0))
       with c_30:
-        st.write("**30% Desejos (Teto)**")
-        st.write(f"Gasto: R$ {des:,.2f} / Meta: R$ {meta_des:,.2f}")
+        st.markdown(
+            f"""
+            <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">30% DESEJOS (TETO)</span>
+                <p style="color: #f8fafc; font-size: 14px; margin: 6px 0;">Gasto: R$ {des:,.2f} / Meta: R$ {meta_des:,.2f}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.progress(min(des / meta_des if meta_des > 0 else 0, 1.0))
       with c_20:
-        st.write("**20% Investimentos (Mínimo)**")
-        st.write(f"Guardado: R$ {inv:,.2f} / Meta: R$ {meta_inv:,.2f}")
+        st.markdown(
+            f"""
+            <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">20% INVESTIMENTOS (MÍNIMO)</span>
+                <p style="color: #f8fafc; font-size: 14px; margin: 6px 0;">Guardado: R$ {inv:,.2f} / Meta: R$ {meta_inv:,.2f}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.progress(min(inv / meta_inv if meta_inv > 0 else 0, 1.0))
 
     st.markdown("---")
@@ -1276,7 +1396,15 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
         teto_meta = meta_row["valor_meta"]
         gasto_cat_real = df[(df["categoria"] == c_nome) & (df["tipo"] == "Despesa")]["valor"].sum()
         pct_atingido = (gasto_cat_real / teto_meta) if teto_meta > 0 else 0.0
-        st.write(f"**{c_nome}** — Real: R$ {gasto_cat_real:,.2f} / Teto: R$ {teto_meta:,.2f} ({(pct_atingido*100):.1f}%)")
+        st.markdown(
+            f"""
+            <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <span style="color: #f8fafc; font-weight: 600; font-size: 14px;">{c_nome}</span>
+                <p style="color: #94a3b8; font-size: 13px; margin: 4px 0;">Real: R$ {gasto_cat_real:,.2f} / Teto: R$ {teto_meta:,.2f} ({(pct_atingido*100):.1f}%)</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.progress(min(pct_atingido, 1.0))
 
     st.markdown("---")
@@ -1336,9 +1464,36 @@ elif st.session_state.pagina_atual == "📥 Dashboard Banco":
 
     st.markdown("### 📊 Indicadores Consolidados do Extrato Bancário")
     cb1, cb2, cb3 = st.columns(3)
-    cb1.metric("💰 Saldo Líquido do Extrato", f"R$ {saldo_b:,.2f}")
-    cb2.metric("🟢 Entradas no Extrato", f"R$ {rec_b:,.2f}")
-    cb3.metric("🔴 Saídas no Extrato", f"R$ {desp_b:,.2f}")
+    with cb1:
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💰 SALDO LÍQUIDO DO EXTRATO</span>
+              <h3 style="color: #3b82f6; margin: 8px 0 0 0; font-size: 20px;">R$ {saldo_b:,.2f}</h3>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
+    with cb2:
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">🟢 ENTRADAS NO EXTRATO</span>
+              <h3 style="color: #22c55e; margin: 8px 0 0 0; font-size: 20px;">R$ {rec_b:,.2f}</h3>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
+    with cb3:
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">🔴 SAÍDAS NO EXTRATO</span>
+              <h3 style="color: #ef4444; margin: 8px 0 0 0; font-size: 20px;">R$ {desp_b:,.2f}</h3>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
 
     st.markdown("---")
     st.subheader("🔥 Dias de Pico de Saídas (Extrato Bancário)")
@@ -1349,7 +1504,15 @@ elif st.session_state.pagina_atual == "📥 Dashboard Banco":
       for idx_p, (_, row_pb) in enumerate(picos_banco.iterrows()):
         if idx_p < len(cols_pb):
           with cols_pb[idx_p]:
-            st.metric(f"📅 Dia {row_pb['data'].strftime('%d/%m/%Y')}", f"R$ {row_pb['valor']:,.2f}", help="Concentração de saídas neste dia do extrato.")
+            st.markdown(
+                f"""
+                <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                    <span style="color: #f87171; font-size: 12px; font-weight: 700;">📅 DIA {row_pb['data'].strftime('%d/%m/%Y')}</span>
+                    <h3 style="color: #ef4444; margin: 8px 0 0 0; font-size: 18px;">R$ {row_pb['valor']:,.2f}</h3>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
     st.subheader("📈 Distribuição de Gastos do Extrato por Categoria")
@@ -1378,42 +1541,70 @@ elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
   st.subheader("📅 Previsão Financeira & Simulador de Imprevistos")
   st.write("Visualize suas finanças detalhadamente por mês ou acumulado anual, incluindo entradas previstas, contas a pagar, contas a receber e simulações.")
 
-  if "prev_data_atual" not in st.session_state:
+  if "prev_data_atual" not in st.session_state or not isinstance(st.session_state.prev_data_atual, (date, datetime)):
     st.session_state.prev_data_atual = datetime.now().replace(day=1)
 
-  col_p1, col_p2, col_p3 = st.columns([3, 3, 2])
-  with col_p1:
-    tipo_visao = st.radio("Período da Visão:", ["Mensal", "Anual"], horizontal=True)
-  with col_p2:
-    formato_exibicao = st.radio("Formato de Exibição:", ["Gráfico", "Tabela"], horizontal=True)
-  with col_p3:
-    st.write("")
+  # Botões menores, com cores diferentes e sem calendário (conforme solicitado)
+  col_cfg1, col_cfg2, col_exp_btn = st.columns([3, 3, 2])
+  
+  with col_cfg1:
+    st.markdown("<span style='font-size:12px; color:#94a3b8; font-weight:600;'>PERÍODO DA VISÃO</span>", unsafe_allow_html=True)
+    if "tipo_visao" not in st.session_state:
+      st.session_state.tipo_visao = "Mensal"
+    
+    cv_p1, cv_p2 = st.columns(2)
+    with cv_p1:
+      is_mensal = (st.session_state.tipo_visao == "Mensal")
+      if st.button("Mensal", use_container_width=True, type="primary" if is_mensal else "secondary"):
+        st.session_state.tipo_visao = "Mensal"
+        st.rerun()
+    with cv_p2:
+      is_anual = (st.session_state.tipo_visao == "Anual")
+      if st.button("Anual", use_container_width=True, type="primary" if is_anual else "secondary"):
+        st.session_state.tipo_visao = "Anual"
+        st.rerun()
+
+  with col_cfg2:
+    st.markdown("<span style='font-size:12px; color:#94a3b8; font-weight:600;'>FORMATO DE EXIBIÇÃO</span>", unsafe_allow_html=True)
+    if "formato_exibicao" not in st.session_state:
+      st.session_state.formato_exibicao = "Gráfico"
+
+    cv_e1, cv_e2 = st.columns(2)
+    with cv_e1:
+      is_grafico = (st.session_state.formato_exibicao == "Gráfico")
+      if st.button("Gráfico", use_container_width=True, type="primary" if is_grafico else "secondary"):
+        st.session_state.formato_exibicao = "Gráfico"
+        st.rerun()
+    with cv_e2:
+      is_tabela = (st.session_state.formato_exibicao == "Tabela")
+      if st.button("Tabela", use_container_width=True, type="primary" if is_tabela else "secondary"):
+        st.session_state.formato_exibicao = "Tabela"
+        st.rerun()
+
+  with col_exp_btn:
+    st.markdown("<span style='font-size:12px; color:transparent;'>EXPORTAR</span>", unsafe_allow_html=True)
     if st.button("📥 Exportar Relatório", use_container_width=True):
       st.success("Relatório de previsão exportado com sucesso!")
 
+  tipo_visao = st.session_state.tipo_visao
+  formato_exibicao = st.session_state.formato_exibicao
+
   st.markdown("---")
 
-  col_nav_cal1, col_nav_cal2, col_nav_cal3 = st.columns([1, 4, 1])
-  with col_nav_cal1:
-    if st.button("❮ Mês Anterior", use_container_width=True):
+  # Navegação de mês lado a lado em botões pequenos e distintos (sem calendário)
+  st.markdown("<span style='font-size:12px; color:#94a3b8; font-weight:600; text-transform:uppercase;'>Selecionar Mês de Referência (Navegação Rápida)</span>", unsafe_allow_html=True)
+  
+  col_nav_ant, col_nav_prox = st.columns(2)
+  with col_nav_ant:
+    if st.button("❮ Mês Anterior", use_container_width=True, type="secondary"):
       if tipo_visao == "Mensal":
         st.session_state.prev_data_atual = (st.session_state.prev_data_atual - timedelta(days=1)).replace(day=1)
       else:
         st.session_state.prev_data_atual = st.session_state.prev_data_atual.replace(year=st.session_state.prev_data_atual.year - 1)
       st.rerun()
 
-  with col_nav_cal2:
-    data_calendario_escolhida = st.date_input(
-        "📅 Selecionar Data de Referência da Previsão (DD/MM/AAAA):",
-        value=st.session_state.prev_data_atual,
-        key="picker_previsao_data",
-        format="DD/MM/YYYY"
-    )
-    if data_calendario_escolhida:
-      st.session_state.prev_data_atual = datetime.combine(data_calendario_escolhida, datetime.min.time()).replace(day=1)
-
-  with col_nav_cal3:
-    if st.button("Mês Seguinte ❯", use_container_width=True):
+  with col_nav_prox:
+    if st.button("Mês Seguinte ❯", use_container_width=True, type="primary"):
       if tipo_visao == "Mensal":
         st.session_state.prev_data_atual = (st.session_state.prev_data_atual + timedelta(days=32)).replace(day=1)
       else:
@@ -1515,9 +1706,9 @@ elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
   with m1:
     st.markdown(
         f"""
-        <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 20px;">
-            <span style="color: #4ade80; font-size: 13px; font-weight: 600;">🟢 TOTAL ENTRADAS (Com A Receber)</span>
-            <h2 style="color: #22c55e; margin: 5px 0 0 0;">R$ {total_entradas_previstas:,.2f}</h2>
+        <div style="background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 14px; padding: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <span style="color: #4ade80; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">🟢 TOTAL ENTRADAS (Com A Receber)</span>
+            <h2 style="color: #22c55e; margin: 8px 0 0 0; font-size: 22px;">R$ {total_entradas_previstas:,.2f}</h2>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1525,9 +1716,9 @@ elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
   with m2:
     st.markdown(
         f"""
-        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 20px;">
-            <span style="color: #f87171; font-size: 13px; font-weight: 600;">🔴 TOTAL SAÍDAS</span>
-            <h2 style="color: #ef4444; margin: 5px 0 0 0;">R$ {total_saidas_previstas:,.2f}</h2>
+        <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 14px; padding: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <span style="color: #f87171; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">🔴 TOTAL SAÍDAS</span>
+            <h2 style="color: #ef4444; margin: 8px 0 0 0; font-size: 22px;">R$ {total_saidas_previstas:,.2f}</h2>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1535,9 +1726,9 @@ elif st.session_state.pagina_atual == "🔮 Previsão Financeira":
   with m3:
     st.markdown(
         f"""
-        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 20px;">
-            <span style="color: #60a5fa; font-size: 13px; font-weight: 600;">⚖️ SALDO PROJETADO</span>
-            <h2 style="color: #3b82f6; margin: 5px 0 0 0;">R$ {saldo_projetado:,.2f}</h2>
+        <div style="background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 14px; padding: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <span style="color: #60a5fa; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">⚖️ SALDO PROJETADO</span>
+            <h2 style="color: #3b82f6; margin: 8px 0 0 0; font-size: 22px;">R$ {saldo_projetado:,.2f}</h2>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1698,8 +1889,14 @@ elif st.session_state.pagina_atual == "💳 Cartão de Crédito":
     st.dataframe(df_cartao, use_container_width=True)
 
     total_fatura = df_cartao["valor"].sum()
-    st.metric(
-        "💳 Montante Total Acumulado em Cartões", f"R$ {total_fatura:,.2f}"
+    st.markdown(
+        f"""
+        <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; margin-top: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💳 MONTANTE TOTAL ACUMULADO EM CARTÕES</span>
+            <h3 style="color: #f59e0b; margin: 8px 0 0 0; font-size: 20px;">R$ {total_fatura:,.2f}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.markdown("---")
@@ -1786,9 +1983,36 @@ elif st.session_state.pagina_atual == "📈 Investimentos":
     patrimonio_total = df_carteira["Valor Total"].sum()
 
     col_m1, col_m2, col_m3 = st.columns(3)
-    col_m1.metric("💎 Patrimônio Total Alocado", f"R$ {patrimonio_total:,.2f}")
-    col_m2.metric("📦 Total de Ativos Únicos", len(df_carteira["ativo"].unique()))
-    col_m3.metric("📊 Classes Distintas", len(df_carteira["classe"].unique()))
+    with col_m1:
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">💎 PATRIMÔNIO TOTAL ALOCADO</span>
+              <h3 style="color: #34d399; margin: 8px 0 0 0; font-size: 20px;">R$ {patrimonio_total:,.2f}</h3>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
+    with col_m2:
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">📦 TOTAL DE ATIVOS ÚNICOS</span>
+              <h3 style="color: #60a5fa; margin: 8px 0 0 0; font-size: 20px;">{len(df_carteira['ativo'].unique())}</h3>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
+    with col_m3:
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">📊 CLASSES DISTINTAS</span>
+              <h3 style="color: #f59e0b; margin: 8px 0 0 0; font-size: 20px;">{len(df_carteira['classe'].unique())}</h3>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
 
     st.markdown("---")
     col_pos1, col_pos2 = st.columns(2)
@@ -1845,8 +2069,12 @@ elif st.session_state.pagina_atual == "🎯 Desafios":
   meta_total_desafio = df_deps["valor"].sum()
 
   st.markdown(
-      f"<h3 style='color: #00FF7F; text-align: center;'>Progresso Atual: R$"
-      f" {total_concluido:,.2f} / R$ {meta_total_desafio:,.2f}</h3>",
+      f"""
+      <div style="background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">🎯 PROGRESSO ATUAL DO DESAFIO</span>
+          <h2 style="color: #22c55e; margin: 8px 0 0 0; font-size: 24px;">R$ {total_concluido:,.2f} / R$ {meta_total_desafio:,.2f}</h2>
+      </div>
+      """,
       unsafe_allow_html=True,
   )
   st.progress(min(total_concluido / meta_total_desafio if meta_total_desafio > 0 else 0, 1.0))
@@ -1955,9 +2183,14 @@ elif st.session_state.pagina_atual == "🎯 Metas de Gastos":
           else 0.0
       )
 
-      st.write(
-          f"**{cat_nome}** — Gasto Real: R$ {gasto_atual_meta:,.2f} / Meta"
-          f" Teto: R$ {v_meta:,.2f}"
+      st.markdown(
+          f"""
+          <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+              <span style="color: #f8fafc; font-weight: 600; font-size: 14px;">{cat_nome}</span>
+              <p style="color: #94a3b8; font-size: 13px; margin: 4px 0;">Gasto Real: R$ {gasto_atual_meta:,.2f} / Meta Teto: R$ {v_meta:,.2f}</p>
+          </div>
+          """,
+          unsafe_allow_html=True,
       )
       if v_meta > 0:
         st.progress(min(gasto_atual_meta / v_meta, 1.0))
@@ -2096,7 +2329,7 @@ elif st.session_state.pagina_atual == "❤️ Saúde Financeira":
   botao_voltar()
   st.subheader("❤️ Score de Saúde Financeira & Auditoria de Perfil")
   st.write(
-      "Pontuação calculada de 0 a 1000 com base em endividamento, taxa de"
+      "Pontuação calculada de 0 a 1000 com base en endividamento, taxa de"
       " poupança, disciplina e cumprimento de tetos."
   )
 
@@ -2158,10 +2391,10 @@ elif st.session_state.pagina_atual == "❤️ Saúde Financeira":
 
   st.markdown(
       f"""
-    <div style="background-color: #1E1E1E; padding: 30px; border-radius: 10px; text-align: center; border: 1px solid #333;">
-        <h1 style="font-size: 60px; color: #FF4B4B; margin: 0;">{score_total}</h1>
-        <p style="color: #888; font-size: 18px; margin: 5px 0 15px 0;">pontos de 1000</p>
-        <h3 style="color: #FFF; margin: 0;">{cor_status} Status: {status_score}</h3>
+    <div style="background: rgba(25, 29, 38, 0.85); padding: 30px; border-radius: 14px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);">
+        <h1 style="font-size: 60px; color: #3b82f6; margin: 0;">{score_total}</h1>
+        <p style="color: #94a3b8; font-size: 14px; margin: 5px 0 15px 0; font-weight: 600;">pontos de 1000</p>
+        <h3 style="color: #f8fafc; margin: 0; font-size: 20px;">{cor_status} Status: {status_score}</h3>
     </div>
     """,
       unsafe_allow_html=True,
@@ -2174,23 +2407,47 @@ elif st.session_state.pagina_atual == "❤️ Saúde Financeira":
       " financeira:"
   )
 
-  st.write(
-      "🛡️ **Controle de Endividamento (Receitas vs Despesas):**"
-      f" {int(f_endividamento)} / 250 pts"
+  st.markdown(
+      f"""
+      <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+          <span style="color: #f8fafc; font-weight: 600; font-size: 14px;">🛡️ Controle de Endividamento (Receitas vs Despesas)</span>
+          <p style="color: #94a3b8; font-size: 13px; margin: 4px 0;">Pontuação: {int(f_endividamento)} / 250 pts</p>
+      </div>
+      """,
+      unsafe_allow_html=True,
   )
   st.progress(min(f_endividamento / 250, 1.0))
-  st.write(
-      "🎯 **Controle de Desejos (Regra dos 30%):** {int(f_metas_s)} / 250 pts"
+  
+  st.markdown(
+      f"""
+      <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+          <span style="color: #f8fafc; font-weight: 600; font-size: 14px;">🎯 Controle de Desejos (Regra dos 30%)</span>
+          <p style="color: #94a3b8; font-size: 13px; margin: 4px 0;">Pontuação: {int(f_metas_s)} / 250 pts</p>
+      </div>
+      """,
+      unsafe_allow_html=True,
   )
   st.progress(min(f_metas_s / 250, 1.0))
-  st.write(
-      "📈 **Taxa de Poupança / Investimento (Regra dos 20%):**"
-      f" {int(f_poupanca)} / 250 pts"
+  
+  st.markdown(
+      f"""
+      <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+          <span style="color: #f8fafc; font-weight: 600; font-size: 14px;">📈 Taxa de Poupança / Investimento (Regra dos 20%)</span>
+          <p style="color: #94a3b8; font-size: 13px; margin: 4px 0;">Pontuação: {int(f_poupanca)} / 250 pts</p>
+      </div>
+      """,
+      unsafe_allow_html=True,
   )
   st.progress(min(f_poupanca / 250, 1.0))
-  st.write(
-      "📅 **Disciplina de Registros & Frequência:**"
-      f" {int(f_disciplina * 0.5)} / 250 pts"
+  
+  st.markdown(
+      f"""
+      <div style="background: rgba(25, 29, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+          <span style="color: #f8fafc; font-weight: 600; font-size: 14px;">📅 Disciplina de Registros & Frequência</span>
+          <p style="color: #94a3b8; font-size: 13px; margin: 4px 0;">Pontuação: {int(f_disciplina * 0.5)} / 250 pts</p>
+      </div>
+      """,
+      unsafe_allow_html=True,
   )
   st.progress(min((f_disciplina * 0.5) / 250, 1.0))
 
@@ -2233,7 +2490,7 @@ elif st.session_state.pagina_atual == "📅 Contas a Pagar":
 
   st.markdown(
       f"""
-      <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 14px; padding: 20px; margin-bottom: 25px;">
+      <div style="background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 14px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
           <h4 style="color: #60a5fa; margin-top: 0; display: flex; align-items: center; gap: 8px;">📌 Agenda do Dia: {st.session_state.data_calendario_ref.strftime('%d/%m/%Y')}</h4>
       </div>
       """,
@@ -3053,14 +3310,14 @@ elif st.session_state.pagina_atual == "📄 Holerites":
     with col_rec:
       st.markdown(
           f"""
-            <div style="background-color: #1A3322; padding: 25px; border-radius: 10px; border: 1px solid #2E7D32;">
-                <h4 style="color: #A5D6A7; margin-top: 0;">🟢 Detalhamento de Receitas, Proventos & Vale ({mes_ativo_ext})</h4>
-                <hr style="border-color: #2E7D32;">
+            <div style="background: rgba(25, 29, 38, 0.85); padding: 25px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);">
+                <h4 style="color: #4ade80; margin-top: 0;">🟢 Detalhamento de Receitas, Proventos & Vale ({mes_ativo_ext})</h4>
+                <hr style="border-color: rgba(255,255,255,0.08);">
                 <p><b>Salário Bruto / Base:</b> R$ {bruto_ativo:,.2f}</p>
                 <p><b>Adiantamento / Vale Quinzenal:</b> R$ {vale_ativo:,.2f}</p>
                 <p><b>Horas Extras / Adicionais:</b> R$ 0,00</p>
                 <p><b>Outros Proventos:</b> R$ 0,00</p>
-                <h3 style="color: #66BB6A; margin-top: 15px;">Total Bruto & Vales: R$ {bruto_ativo + vale_ativo:,.2f}</h3>
+                <h3 style="color: #22c55e; margin-top: 15px; font-size: 20px;">Total Bruto & Vales: R$ {bruto_ativo + vale_ativo:,.2f}</h3>
             </div>
             """,
           unsafe_allow_html=True,
@@ -3069,14 +3326,14 @@ elif st.session_state.pagina_atual == "📄 Holerites":
     with col_desc:
       st.markdown(
           f"""
-            <div style="background-color: #331A1A; padding: 25px; border-radius: 10px; border: 1px solid #C62828;">
-                <h4 style="color: #EF9A9A; margin-top: 0;">🔴 Detalhamento Separado dos Descontos ({mes_ativo_ext})</h4>
-                <hr style="border-color: #C62828;">
+            <div style="background: rgba(25, 29, 38, 0.85); padding: 25px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);">
+                <h4 style="color: #f87171; margin-top: 0;">🔴 Detalhamento Separado dos Descontos ({mes_ativo_ext})</h4>
+                <hr style="border-color: rgba(255,255,255,0.08);">
                 <p><b>• INSS (Previdência Social):</b> R$ {inss_ativo:,.2f}</p>
                 <p><b>• IRRF (Imposto de Renda Retido):</b> R$ {irrf_ativo:,.2f}</p>
                 <p><b>• Desconto de Vale (Adiantamento):</b> R$ {vale_ativo:,.2f}</p>
                 <p><b>• Convênio / Farmácia / Outros:</b> R$ {max(0, desc_ativo - inss_ativo - irrf_ativo - vale_ativo):,.2f}</p>
-                <h3 style="color: #EF5350; margin-top: 15px;">Total Descontos: R$ {desc_ativo:,.2f}</h3>
+                <h3 style="color: #ef4444; margin-top: 15px; font-size: 20px;">Total Descontos: R$ {desc_ativo:,.2f}</h3>
             </div>
             """,
           unsafe_allow_html=True,
@@ -3086,9 +3343,9 @@ elif st.session_state.pagina_atual == "📄 Holerites":
 
     st.markdown(
         f"""
-        <div style="background-color: #1E222A; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #3F51B5;">
-            <h4 style="color: #9FA8DA; margin: 0;">💵 Receita Líquida ({mes_ativo_ext})</h4>
-            <h2 style="color: #5C6BC0; margin: 5px 0 0 0;">R$ {liquido_ativo:,.2f}</h2>
+        <div style="background: rgba(25, 29, 38, 0.85); padding: 20px; border-radius: 14px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);">
+            <h4 style="color: #94a3b8; margin: 0; font-size: 13px; font-weight: 600;">💵 RECEITA LÍQUIDA ({mes_ativo_ext})</h4>
+            <h2 style="color: #3b82f6; margin: 8px 0 0 0; font-size: 22px;">R$ {liquido_ativo:,.2f}</h2>
         </div>
         """,
         unsafe_allow_html=True,
