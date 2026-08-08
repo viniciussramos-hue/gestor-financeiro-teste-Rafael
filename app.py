@@ -1153,7 +1153,7 @@ elif st.session_state.pagina_atual == "📊 Dashboard Manual":
   st.subheader("📊 Executive Dashboard — Lançamentos Reais Manuais")
   st.write("Painel gerencial focado exclusivamente nos registros feitos de forma manual no sistema.")
 
-  df_all = pd.read_sql("SELECT * FROM transacoes WHERE origem = 'Manual' OR origem = 'Nota_Fiscal'", conn)
+  df_all = pd.read_sql("SELECT * FROM transacoes WHERE origem = 'Manual' OR origem = 'Nota_Fiscal' OR origem = 'Voz_IA' OR origem = 'Chat_IA'", conn)
   df_inv_dash = pd.read_sql("SELECT * FROM carteira_investimentos", conn)
   df_cartao_dash = pd.read_sql("SELECT * FROM cartao_credito", conn)
   df_contas_dash = pd.read_sql("SELECT * FROM contas", conn)
@@ -1941,7 +1941,7 @@ elif st.session_state.pagina_atual == "🎯 Metas de Gastos":
   st.subheader("📋 Acompanhamento Visual das Metas de Gastos")
   df_metas = pd.read_sql("SELECT * FROM metas", conn)
   df_trans_meta = pd.read_sql(
-      "SELECT * FROM transacoes WHERE tipo = 'Despesa' AND (origem = 'Manual' OR origem = 'Nota_Fiscal')", conn
+      "SELECT * FROM transacoes WHERE tipo = 'Despesa' AND (origem = 'Manual' OR origem = 'Nota_Fiscal' OR origem = 'Voz_IA' OR origem = 'Chat_IA')", conn
   )
 
   if not df_metas.empty:
@@ -2099,7 +2099,7 @@ elif st.session_state.pagina_atual == "❤️ Saúde Financeira":
       " poupança, disciplina e cumprimento de tetos."
   )
 
-  df_saude = pd.read_sql("SELECT * FROM transacoes WHERE origem = 'Manual' OR origem = 'Nota_Fiscal'", conn)
+  df_saude = pd.read_sql("SELECT * FROM transacoes WHERE origem = 'Manual' OR origem = 'Nota_Fiscal' OR origem = 'Voz_IA' OR origem = 'Chat_IA'", conn)
   receitas_s = (
       df_saude[df_saude["tipo"] == "Receita"]["valor"].sum()
       if not df_saude.empty
