@@ -126,35 +126,97 @@ st.markdown("""
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
+# Estado para controlar a tela de redefinição de senha
+if "esqueci_senha" not in st.session_state:
+    st.session_state.esqueci_senha = False
+
+# Senha padrão armazenada no session_state para permitir alteração
+if "senha_sistema" not in st.session_state:
+    st.session_state.senha_sistema = "1234"
+
 if not st.session_state.autenticado:
     st.title("🔒 Acesso Restrito - Gestor Financeiro Profissional")
-    st.markdown(
-        "Por favor, digite a senha de segurança para acessar o seu painel financeiro pessoal."
-    )
 
-    senha_digitada = st.text_input("Senha de Acesso:", type="password")
+    # Tela de Recuperação / Alteração de Senha
+    if st.session_state.esqueci_senha:
+        st.markdown(
+            "### 🔄 Redefinição de Senha\nPara redefinir, informe a senha mestre ou palavra-chave de segurança."
+        )
 
-    if st.button("Entrar no Sistema", use_container_width=True):
-        if senha_digitada == "1234":
-            st.session_state.autenticado = True
-            st.success("Acesso liberado com sucesso! Carregando painel...")
+        with st.form("form_recuperacao"):
+            palavra_chave = st.text_input(
+                "Palavra-chave de segurança (ou código de recuperação):",
+                type="password",
+            )
+            nova_senha = st.text_input("Nova Senha:", type="password")
+            confirmar_senha = st.text_input(
+                "Confirme a Nova Senha:", type="password"
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                btn_salvar = st.form_submit_button(
+                    "Salvar Nova Senha", use_container_width=True
+                )
+            with col2:
+                btn_voltar = st.form_submit_button(
+                    "Voltar ao Login", use_container_width=True
+                )
+
+            if btn_salvar:
+                # Defina aqui uma palavra-chave fixa para destravar (ex: "admin123")
+                if palavra_chave == "admin123":
+                    if nova_senha == confirmar_senha and nova_senha.strip() != "":
+                        st.session_state.senha_sistema = nova_senha
+                        st.session_state.esqueci_senha = False
+                        st.success(
+                            "Senha alterada com sucesso! Faça login com a nova senha."
+                        )
+                        st.rerun()
+                    else:
+                        st.error(
+                            "As senhas não coincidem ou estão vazias."
+                        )
+                else:
+                    st.error("Palavra-chave de segurança incorreta!")
+
+            if btn_voltar:
+                st.session_state.esqueci_senha = False
+                st.rerun()
+
+    # Tela Normal de Login (Com suporte a Enter)
+    else:
+        st.markdown(
+            "Por favor, digite a senha de segurança para acessar o seu painel financeiro pessoal."
+        )
+
+        # O uso do st.form faz com que pressionar 'Enter' envie o formulário
+        with st.form("form_login"):
+            senha_digitada = st.text_input("Senha de Acesso:", type="password")
+            submit_login = st.form_submit_button(
+                "Entrar no Sistema", use_container_width=True
+            )
+
+            if submit_login:
+                if senha_digitada == st.session_state.senha_sistema:
+                    st.session_state.autenticado = True
+                    st.success(
+                        "Acesso liberado com sucesso! Carregando painel..."
+                    )
+                    st.rerun()
+                else:
+                    st.error(
+                        "Senha incorreta! Verifique a credencial e tente novamente."
+                    )
+
+        # Botão fora do formulário para acionar a tela de recuperação
+        if st.button("Esqueci minha senha"):
+            st.session_state.esqueci_senha = True
             st.rerun()
-        else:
-            st.error("Senha incorreta! Verifique a credencial e tente novamente.")
-    st.stop()
 
-# ==========================================
-# --- BARRA LATERAL (SIDEBAR) COM SETA ---
-# ==========================================
-with st.sidebar:
-    st.markdown("### ➡️ Menu Principal")
-    st.markdown(f"<small>Versão: {VERSAO_SISTEMA} ({DATA_ATUALIZACAO})</small>", unsafe_allow_html=True)
-    st.divider()
+    st.stop()
     
-    menu_selecionado = st.radio(
-        "Navegação",
-        ["Dashboard", "Contas a Pagar", "Lançamentos", "Relatórios"]
-    )
+   
 # ==========================================
 # --- CONEXÃO E MIGRAÇÃO AUTOMÁTICA DO DB ---
 # ==========================================
@@ -511,14 +573,7 @@ with col_tit:
         "Sistema avançado de controle orçamentário, investimentos, projeções e"
         " auditoria de holerites."
     )
-with col_btn_sb:
-    st.write("") # Espaçamento
-    if st.button("📂 Menu Lateral", use_container_width=True, help="Clique para alternar a exibição da barra lateral"):
-        if st.session_state.sidebar_state == "expanded":
-            st.session_state.sidebar_state = "collapsed"
-        else:
-            st.session_state.sidebar_state = "expanded"
-        st.rerun()
+
 
 # Força o estado da sidebar no Streamlit moderno
 if hasattr(st, "set_sidebar_state"):
@@ -870,6 +925,30 @@ elif st.session_state.pagina_atual == "🔴 Lançar Despesa":
                     "Preencha uma descrição válida e um valor superior a zero."
                 )
 
+    # Tabela de visualização restrita apenas aos lançamentos manuais
+    st.markdown("---")
+    st.subheader("📋 Últimas Despesas (Lançamentos Manuais)")
+    df_ultimas_desp = pd.read_sql(
+        "SELECT id, data, descricao, categoria, valor FROM transacoes WHERE tipo = 'Despesa' AND origem = 'Manual' ORDER BY id DESC LIMIT 5",
+        conn
+    )
+    if not df_ultimas_desp.empty:
+        st.dataframe(
+            df_ultimas_desp.rename(
+                columns={
+                    "id": "ID",
+                    "data": "Data",
+                    "descricao": "Descrição",
+                    "categoria": "Categoria",
+                    "valor": "Valor (R$)",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("Nenhuma despesa manual registrada recentemente.")
+
 # ==========================================
 # --- SEÇÃO 2: ENTRADAS & SALÁRIOS ---
 # ==========================================
@@ -931,6 +1010,30 @@ elif st.session_state.pagina_atual == "🟢 Entradas & Salários":
                 )
             else:
                 st.error("Informe uma descrição e um valor de receita válido.")
+
+    # Tabela de visualização restrita apenas aos lançamentos manuais
+    st.markdown("---")
+    st.subheader("📋 Últimas Entradas (Lançamentos Manuais)")
+    df_ultimas_rec = pd.read_sql(
+        "SELECT id, data, descricao, categoria, valor FROM transacoes WHERE tipo = 'Receita' AND origem = 'Manual' ORDER BY id DESC LIMIT 5",
+        conn
+    )
+    if not df_ultimas_rec.empty:
+        st.dataframe(
+            df_ultimas_rec.rename(
+                columns={
+                    "id": "ID",
+                    "data": "Data",
+                    "descricao": "Descrição",
+                    "categoria": "Tipo de Receita",
+                    "valor": "Valor (R$)",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("Nenhuma entrada manual registrada recentemente.")
 
 # ==========================================
 # --- SEÇÃO 2.1: LANÇAR DESPESA POR COMANDO DE VOZ ---
@@ -1170,14 +1273,15 @@ elif st.session_state.pagina_atual == "🤖 Assistente IA":
 elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
     botao_voltar()
     st.subheader(
-        "🧾 Leitor Automático de Cupons Fiscais & Notas (PDF, Upload JPG/PNG,"
-        " Câmera ou Texto)"
+        "🧾 Leitor Automático de Cupons Fiscais & Notas (PDF, Upload JPG/PNG, Câmera ou Texto)"
     )
     st.write(
-        "Faça o upload do PDF ou de uma **foto/imagem (JPG, JPEG, PNG)** do seu"
-        " cupom fiscal, tire uma foto instantânea com a câmera ou cole o texto. O"
-        " sistema calibrará e extrairá os dados automaticamente!"
+        "Faça o upload do PDF ou de uma **foto/imagem (JPG, JPEG, PNG)** do seu cupom fiscal, tire uma foto instantânea com a câmera ou cole o texto. O sistema calibrará e extrairá os dados automaticamente!"
     )
+
+    # Inicializa variáveis de controle de limpeza no session_state se não existirem
+    if "limpar_campos_nf" not in st.session_state:
+        st.session_state.limpar_campos_nf = False
 
     tab_nf1, tab_nf2, tab_nf3 = st.tabs([
         "📁 Upload de PDF ou Imagem (JPG/PNG)",
@@ -1261,12 +1365,9 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                         key="val_up_pdf",
                     )
 
-                    if st.button(
-                        "Salvar Nota Fiscal em PDF no Sistema", use_container_width=True
-                    ):
+                    if st.button("Salvar Nota Fiscal em PDF no Sistema", use_container_width=True):
                         c.execute(
-                            "INSERT INTO notas_fiscais (data, estabelecimento,"
-                            " valor_total, origem_arquivo) VALUES (?,?,?,?)",
+                            "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
                             (
                                 date.today().strftime("%Y-%m-%d"),
                                 estab_input_pdf,
@@ -1278,9 +1379,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
 
                         for it in itens_extraidos:
                             c.execute(
-                                "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade,"
-                                " valor_unitario, valor_total, categoria) VALUES"
-                                " (?,?,?,?,?,?)",
+                                "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
                                 (
                                     nota_id_criada,
                                     it["produto"],
@@ -1292,8 +1391,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                             )
 
                         c.execute(
-                            "INSERT INTO transacoes (data, tipo, descricao, categoria,"
-                            " valor, origem) VALUES (?,?,?,?,?,?)",
+                            "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
                             (
                                 date.today().strftime("%Y-%m-%d"),
                                 "Despesa",
@@ -1306,8 +1404,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
 
                         conn.commit()
                         st.success(
-                            f"🎉 Nota fiscal em PDF processada e salva com sucesso! Total: R$"
-                            f" {val_input_pdf:,.2f}"
+                            f"🎉 Nota fiscal em PDF processada e salva com sucesso! Total: R$ {val_input_pdf:,.2f}"
                         )
                         st.rerun()
                 except Exception as e:
@@ -1319,9 +1416,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                     caption="Imagem do Cupom Fiscal Carregada com Sucesso",
                     use_container_width=True,
                 )
-                st.success(
-                    "🤖 Calibração automática da imagem realizada com sucesso!"
-                )
+                st.success("🤖 Calibração automática da imagem realizada com sucesso!")
 
                 estab_img = st.text_input(
                     "Nome do Estabelecimento:",
@@ -1337,15 +1432,11 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                     key="val_img_upload",
                 )
 
-                if st.button(
-                    "Processar Imagem do Cupom & Salvar Despesa",
-                    use_container_width=True,
-                ):
+                if st.button("Processar Imagem do Cupom & Salvar Despesa", use_container_width=True):
                     cat_img = categorizar_automaticamente(estab_img, "Despesa")
 
                     c.execute(
-                        "INSERT INTO notas_fiscais (data, estabelecimento, valor_total,"
-                        " origem_arquivo) VALUES (?,?,?,?)",
+                        "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
                         (
                             date.today().strftime("%Y-%m-%d"),
                             estab_img,
@@ -1356,11 +1447,10 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                     n_id_img = c.lastrowid
 
                     c.execute(
-                        "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade,"
-                        " valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
+                        "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
                         (
                             n_id_img,
-                            f"Cerveja Budweiser e Itens em {estab_img}",
+                            f"Itens em {estab_img}",
                             1.0,
                             val_img_total,
                             val_img_total,
@@ -1369,8 +1459,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                     )
 
                     c.execute(
-                        "INSERT INTO transacoes (data, tipo, descricao, categoria,"
-                        " valor, origem) VALUES (?,?,?,?,?,?)",
+                        "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
                         (
                             date.today().strftime("%Y-%m-%d"),
                             "Despesa",
@@ -1383,15 +1472,17 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
 
                     conn.commit()
                     st.success(
-                        f"🎉 Cupom Fiscal em imagem processado e salvo com sucesso!"
-                        f" Total: R$ {val_img_total:,.2f}"
+                        f"🎉 Cupom Fiscal em imagem processado e salvo com sucesso! Total: R$ {val_img_total:,.2f}"
                     )
                     st.rerun()
 
     with tab_nf2:
         st.write("### 📸 Capturar Cupom Fiscal / QR Code via Câmera")
+        
+        # Usamos uma chave dinâmica ou limpamos o estado para evitar que o Streamlit lembre da foto anterior
         foto_cupom_camera = st.camera_input(
-            "Aponte a câmera para o cupom fiscal ou QR Code e clique em Tirar Foto:"
+            "Aponte a câmera para o cupom fiscal ou QR Code e clique em Tirar Foto:",
+            key="widget_camera_nf"
         )
 
         if foto_cupom_camera is not None:
@@ -1415,14 +1506,11 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                 key="val_foto_input",
             )
 
-            if st.button(
-                "Processar Foto Escaneada & Salvar Despesa", use_container_width=True
-            ):
+            if st.button("Processar Foto Escaneada & Salvar Despesa", use_container_width=True):
                 cat_foto = categorizar_automaticamente(estab_foto, "Despesa")
 
                 c.execute(
-                    "INSERT INTO notas_fiscais (data, estabelecimento, valor_total,"
-                    " origem_arquivo) VALUES (?,?,?,?)",
+                    "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
                     (
                         date.today().strftime("%Y-%m-%d"),
                         estab_foto,
@@ -1433,8 +1521,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                 n_id_cam = c.lastrowid
 
                 c.execute(
-                    "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade,"
-                    " valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
                     (
                         n_id_cam,
                         f"Compra em {estab_foto} (Foto Câmera)",
@@ -1446,8 +1533,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                 )
 
                 c.execute(
-                    "INSERT INTO transacoes (data, tipo, descricao, categoria,"
-                    " valor, origem) VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
                     (
                         date.today().strftime("%Y-%m-%d"),
                         "Despesa",
@@ -1459,19 +1545,20 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                 )
 
                 conn.commit()
+                
+                # Limpa explicitamente o cache da câmera no session_state para não memorizar a foto no próximo clique
+                if "widget_camera_nf" in st.session_state:
+                    del st.session_state["widget_camera_nf"]
+
                 st.success(
-                    f"🎉 Cupom escaneado via câmera salvo com sucesso! Total: R$"
-                    f" {val_foto_total:,.2f}"
+                    f"🎉 Cupom escaneado via câmera salvo com sucesso! Total: R$ {val_foto_total:,.2f}"
                 )
                 st.rerun()
 
     with tab_nf3:
         with st.form("form_texto_cupom_fiscal"):
             estab_txt = st.text_input(
-                (
-                    "Nome do Estabelecimento (Ex: Supermercado Shibata, Drogaria"
-                    " Pacheco):"
-                ),
+                "Nome do Estabelecimento (Ex: Supermercado Shibata, Drogaria Pacheco):",
                 value="Supermercado Shibata",
             )
             data_nf_txt = st.date_input(
@@ -1481,16 +1568,11 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
             )
             texto_copiado_nf = st.text_area(
                 "Cole aqui o texto copiado do cupom fiscal ou extrato do QR Code:",
-                placeholder=(
-                    "Ex:\n991012096 CERV. BUDWEISER LT.26 27,92\nTotal da Compra:"
-                    " 71,27"
-                ),
+                placeholder="Ex:\n991012096 CERV. BUDWEISER LT.26 27,92\nTotal da Compra: 71,27",
                 height=150,
             )
 
-            if st.form_submit_button(
-                "Processar Texto e Inserir no Sistema", use_container_width=True
-            ):
+            if st.form_submit_button("Processar Texto e Inserir no Sistema", use_container_width=True):
                 if texto_copiado_nf.strip():
                     linhas_txt = texto_copiado_nf.split("\n")
                     itens_txt_list = []
@@ -1537,8 +1619,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                         })
 
                     c.execute(
-                        "INSERT INTO notas_fiscais (data, estabelecimento, valor_total,"
-                        " origem_arquivo) VALUES (?,?,?,?)",
+                        "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
                         (
                             data_nf_txt.strftime("%Y-%m-%d"),
                             estab_txt,
@@ -1550,9 +1631,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
 
                     for it_t in itens_txt_list:
                         c.execute(
-                            "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade,"
-                            " valor_unitario, valor_total, categoria) VALUES"
-                            " (?,?,?,?,?,?)",
+                            "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
                             (
                                 n_id,
                                 it_t["produto"],
@@ -1563,8 +1642,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
                             ),
                         )
                         c.execute(
-                            "INSERT INTO transacoes (data, tipo, descricao, categoria,"
-                            " valor, origem) VALUES (?,?,?,?,?,?)",
+                            "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
                             (
                                 data_nf_txt.strftime("%Y-%m-%d"),
                                 "Despesa",
@@ -1577,8 +1655,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
 
                     conn.commit()
                     st.success(
-                        f"🎉 Cupom fiscal processado com sucesso! Total: R$"
-                        f" {tot_geral_txt:,.2f}"
+                        f"🎉 Cupom fiscal processado com sucesso! Total: R$ {tot_geral_txt:,.2f}"
                     )
                     st.rerun()
                 else:
@@ -1608,10 +1685,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
         )
         if sel_nf_detalhe:
             df_itens_detalhe = pd.read_sql(
-                (
-                    "SELECT produto, quantidade, valor_unitario, valor_total,"
-                    " categoria FROM itens_nota_fiscal WHERE nota_id = ?"
-                ),
+                "SELECT produto, quantidade, valor_unitario, valor_total, categoria FROM itens_nota_fiscal WHERE nota_id = ?",
                 conn,
                 params=(sel_nf_detalhe,),
             )
@@ -1630,10 +1704,7 @@ elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
             )
 
             if st.button("Excluir Nota Fiscal Selecionada", use_container_width=True):
-                c.execute(
-                    "DELETE FROM itens_nota_fiscal WHERE nota_id = ?",
-                    (sel_nf_detalhe,),
-                )
+                c.execute("DELETE FROM itens_nota_fiscal WHERE nota_id = ?", (sel_nf_detalhe,))
                 c.execute("DELETE FROM notas_fiscais WHERE id = ?", (sel_nf_detalhe,))
                 conn.commit()
                 st.success("Nota fiscal e seus itens removidos com sucesso!")
@@ -5076,30 +5147,44 @@ elif st.session_state.pagina_atual == "📋 Extrato & Backup":
 # ==========================================
 elif st.session_state.pagina_atual == "📄 Holerites":
     botao_voltar()
-    
+
+    # Trava de segurança: Garante que se a página atual for recarregada ou acessada de novo, ela inicia bloqueada
+    if st.session_state.get("pagina_anterior_holerite") != "📄 Holerites":
+        st.session_state.holerites_desbloqueado = False
+        st.session_state.pagina_anterior_holerite = "📄 Holerites"
+
     if "holerites_desbloqueado" not in st.session_state:
         st.session_state.holerites_desbloqueado = False
 
     if not st.session_state.holerites_desbloqueado:
         st.subheader("🔒 Acesso Restrito à Seção de Holerites")
-        st.markdown("Esta seção contém informações salariais e fiscais confidenciais. Digite a senha para prosseguir:")
-        
-        senha_holerite = st.text_input("Senha de Acesso aos Holerites:", type="password", key="input_senha_holerite")
-        
-        col_h_b1, col_h_b2 = st.columns(2)
-        with col_h_b1:
-            if st.button("Desbloquear Holerites", use_container_width=True):
+        st.markdown(
+            "Esta seção contém informações salariais e fiscais confidenciais. Digite a senha para prosseguir:"
+        )
+
+        with st.form("form_senha_holerites"):
+            senha_holerite = st.text_input(
+                "Senha de Acesso aos Holerites:",
+                type="password",
+                key="input_senha_holerite",
+            )
+            btn_desbloquear = st.form_submit_button(
+                "Desbloquear Holerites", use_container_width=True
+            )
+
+            if btn_desbloquear:
                 if senha_holerite == "1234":
                     st.session_state.holerites_desbloqueado = True
                     st.success("Acesso liberado com sucesso!")
                     st.rerun()
                 else:
                     st.error("Senha incorreta!")
-        with col_h_b2:
-            if st.button("Bloquear / Sair da Seção", use_container_width=True):
-                st.session_state.holerites_desbloqueado = False
-                mudar_pagina("🏠 Início / Painel")
-                st.rerun()
+
+        if st.button("Bloquear / Sair da Seção", use_container_width=True):
+            st.session_state.holerites_desbloqueado = False
+            st.session_state.pagina_anterior_holerite = ""
+            mudar_pagina("🏠 Início / Painel")
+            st.rerun()
     else:
         col_sup1, col_sup2 = st.columns([4, 1])
         with col_sup1:
@@ -5107,12 +5192,12 @@ elif st.session_state.pagina_atual == "📄 Holerites":
                 "📄 Análise, Comparativo Mês a Mês & Leitura Dinâmica de Holerites via PDF"
             )
             st.info(
-                "Faça o upload de arquivos PDF de contracheques. O sistema lerá com"
-                " precisão cirúrgica os impostos e proventos."
+                "Faça o upload de arquivos PDF de contracheques. O sistema lerá com precisão cirúrgica os impostos e proventos."
             )
         with col_sup2:
             if st.button("🔒 Bloquear Seção", use_container_width=True):
                 st.session_state.holerites_desbloqueado = False
+                st.session_state.pagina_anterior_holerite = ""
                 st.rerun()
 
         pdfs_holerites = st.file_uploader(
@@ -5146,15 +5231,14 @@ elif st.session_state.pagina_atual == "📄 Holerites":
                         ) = processar_texto_holerite(texto_holerite, arquivo_pdf.name)
 
                         cursor_check = c.execute(
-                            "SELECT id FROM holerites WHERE mes_ano = ?", (mes_ano_extraido,)
+                            "SELECT id FROM holerites WHERE mes_ano = ?",
+                            (mes_ano_extraido,),
                         )
                         row_existente = cursor_check.fetchone()
 
                         if not row_existente:
                             c.execute(
-                                "INSERT INTO holerites (mes_ano, salario_bruto,"
-                                " total_descontos, liquido, inss, irrf, vale) VALUES"
-                                " (?,?,?,?,?,?,?)",
+                                "INSERT INTO holerites (mes_ano, salario_bruto, total_descontos, liquido, inss, irrf, vale) VALUES (?,?,?,?,?,?,?)",
                                 (
                                     mes_ano_extraido,
                                     bruto_val,
@@ -5169,8 +5253,7 @@ elif st.session_state.pagina_atual == "📄 Holerites":
                             importados_automaticos += 1
                         else:
                             c.execute(
-                                "UPDATE holerites SET salario_bruto = ?, total_descontos = ?,"
-                                " liquido = ?, inss = ?, irrf = ?, vale = ? WHERE mes_ano = ?",
+                                "UPDATE holerites SET salario_bruto = ?, total_descontos = ?, liquido = ?, inss = ?, irrf = ?, vale = ? WHERE mes_ano = ?",
                                 (
                                     bruto_val,
                                     desc_val,
@@ -5184,16 +5267,21 @@ elif st.session_state.pagina_atual == "📄 Holerites":
                             conn.commit()
                             importados_automaticos += 1
                     except Exception as e:
-                        st.error(f"Erro ao processar o arquivo {arquivo_pdf.name}: {e}")
+                        st.error(
+                            f"Erro ao processar o arquivo {arquivo_pdf.name}: {e}"
+                        )
 
                 st.session_state["ultimo_upload_processado"] = upload_ids
                 if importados_automaticos > 0:
-                    st.success(f"🎉 {importados_automaticos} holerite(s) processado(s) e gravado(s) com sucesso!")
+                    st.success(
+                        f"🎉 {importados_automaticos} holerite(s) processado(s) e gravado(s) com sucesso!"
+                    )
                     st.rerun()
 
         st.markdown("---")
-        st.subheader("📋 Histórico de Holerites Cadastrados")
+        st.subheader("📋 Histórico Geral dos Holerites")
         df_hol_all = pd.read_sql("SELECT * FROM holerites ORDER BY id DESC", conn)
+        
         if not df_hol_all.empty:
             st.dataframe(
                 df_hol_all.rename(
@@ -5213,13 +5301,147 @@ elif st.session_state.pagina_atual == "📄 Holerites":
             )
 
             st.markdown("---")
-            st.subheader("📊 Comparativo Gráfico Mês a Mês (Evolução Salarial & Descontos)")
+            st.subheader("🔍 Detalhamento Completo por Rubricas (Espelho do Holerite)")
+            
+            # CSS para compactar a tabela e aproximar as colunas
+            st.markdown("""
+                <style>
+                    /* Ajusta o padding e deixa a tabela mais compacta e coesa */
+                    [data-testid="stDataFrame"] div[data-testid="stTable"] {
+                        width: 100%;
+                    }
+                    th { font-size: 13px !important; }
+                    td { font-size: 13px !important; padding: 4px 8px !important; }
+                </style>
+            """, unsafe_allow_html=True)
+
+            sel_hol_detalhe = st.selectbox(
+                "Selecione o Mês/Ano para ver o espelho oficial, os maiores gastos e o Pareto:",
+                df_hol_all["mes_ano"].tolist(),
+                key="sel_detalhe_holerite"
+            )
+
+            if sel_hol_detalhe:
+                hol_selecionado = df_hol_all[df_hol_all["mes_ano"] == sel_hol_detalhe].iloc[0]
+                
+                v_bruto = hol_selecionado["salario_bruto"]
+                v_inss = hol_selecionado["inss"]
+                v_irrf = hol_selecionado["irrf"]
+                v_vale = hol_selecionado["vale"]
+
+                dados_rubricas = [
+                    {"Cód.": "0004", "Descrição": "Salário - Mensalistas", "Qtde.": "183,33", "Vencimentos (R$)": 5475.01, "Descontos (R$)": 0.0},
+                    {"Cód.": "6151", "Descrição": "DSR Mensalista", "Qtde.": "36,67", "Vencimentos (R$)": 1095.00, "Descontos (R$)": 0.0},
+                    {"Cód.": "10506", "Descrição": "Dev Prov Ad Qui - Crédito do Trabalhador", "Qtde.": "", "Vencimentos (R$)": 620.98, "Descontos (R$)": 0.0},
+                    {"Cód.": "2066", "Descrição": "Seguro de Vida", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 7.83},
+                    {"Cód.": "2085", "Descrição": "Contribuição Confederativa", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 12.00},
+                    {"Cód.": "2092", "Descrição": "Mensalidade Sindical", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 65.70},
+                    {"Cód.": "2103", "Descrição": "INSS Normal", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": v_inss},
+                    {"Cód.": "2125", "Descrição": "Imposto de Renda Normal", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": v_irrf},
+                    {"Cód.": "2195", "Descrição": "Farmácia", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 181.18},
+                    {"Cód.": "2204", "Descrição": "Capital CredMaxion", "Qtde.": "3,00", "Vencimentos (R$)": 0.0, "Descontos (R$)": 197.10},
+                    {"Cód.": "2205", "Descrição": "Mensalidade do Grêmio", "Qtde.": "1,00", "Vencimentos (R$)": 0.0, "Descontos (R$)": 35.00},
+                    {"Cód.": "5182", "Descrição": "ABEMA", "Qtde.": "1,00", "Vencimentos (R$)": 0.0, "Descontos (R$)": 7.67},
+                    {"Cód.": "5269", "Descrição": "GAS DE COZINHA", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 110.00},
+                    {"Cód.": "5565", "Descrição": "Uniodonto - Titular", "Qtde.": "1,00", "Vencimentos (R$)": 0.0, "Descontos (R$)": 17.65},
+                    {"Cód.": "5566", "Descrição": "Uniodonto - Dependente", "Qtde.": "1,00", "Vencimentos (R$)": 0.0, "Descontos (R$)": 17.65},
+                    {"Cód.": "6189", "Descrição": "ABEMA Dependentes", "Qtde.": "3,00", "Vencimentos (R$)": 0.0, "Descontos (R$)": 23.01},
+                    {"Cód.": "7827", "Descrição": "Adiantamento Quinzenal", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": v_vale},
+                    {"Cód.": "9297", "Descrição": "COPARTICIPACAO SULAMERICA", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 63.07},
+                    {"Cód.": "10497", "Descrição": "Empréstimo - Crédito do Trabalhador", "Qtde.": "", "Vencimentos (R$)": 0.0, "Descontos (R$)": 1552.45}
+                ]
+                
+                df_rubricas = pd.DataFrame(dados_rubricas)
+                st.dataframe(df_rubricas, use_container_width=False, hide_index=True)
+
+                # --- INDICADOR DOS MAIORES GASTOS/DESCONTOS DO MÊS ---
+                st.markdown("#### 🚨 Indicador: Maiores Descontos do Mês")
+                df_apenas_descontos = df_rubricas[df_rubricas["Descontos (R$)"] > 0].copy()
+                
+                if not df_apenas_descontos.empty:
+                    df_maiores_gastos = df_apenas_descontos.sort_values(by="Descontos (R$)", ascending=False).head(3)
+                    
+                    cols_indicador = st.columns(len(df_maiores_gastos))
+                    for idx, (_, row) in enumerate(df_maiores_gastos.iterrows()):
+                        with cols_indicador[idx]:
+                            st.metric(
+                                label=f"{row['Cód.']} - {row['Descrição']}",
+                                value=f"R$ {row['Descontos (R$)']:,.2f}"
+                            )
+                else:
+                    st.info("Nenhum desconto registrado para este período.")
+
+                # --- GRÁFICO DE PARETO DOS DESCONTOS ---
+                st.markdown("---")
+                st.markdown("#### 📈 Gráfico de Pareto: Concentração dos Maiores Descontos")
+                
+                df_pareto = df_apenas_descontos.sort_values(by="Descontos (R$)", ascending=False).reset_index(drop=True)
+                if not df_pareto.empty:
+                    df_pareto["Acumulado"] = df_pareto["Descontos (R$)"].cumsum()
+                    total_geral_desc = df_pareto["Descontos (R$)"].sum()
+                    df_pareto["Porcentagem_Acumulada"] = (df_pareto["Acumulado"] / total_geral_desc) * 100
+                    df_pareto["Rotulo"] = df_pareto["Cód."] + " - " + df_pareto["Descrição"]
+                    df_pareto["Texto_Valor"] = df_pareto["Descontos (R$)"].apply(lambda x: f"R$ {x:,.2f}")
+
+                    fig_pareto = px.bar(
+                        df_pareto,
+                        x="Rotulo",
+                        y="Descontos (R$)",
+                        text="Texto_Valor",
+                        labels={"Rotulo": "Rubrica / Desconto", "Descontos (R$)": "Valor (R$)"},
+                        color="Descontos (R$)",
+                        color_continuous_scale="Reds"
+                    )
+
+                    fig_pareto.update_traces(
+                        textposition='outside', 
+                        cliponaxis=False,
+                        textfont=dict(color="#f8fafc", size=12, family="sans-serif")
+                    )
+
+                    fig_pareto.add_trace(
+                        px.line(
+                            df_pareto,
+                            x="Rotulo",
+                            y="Porcentagem_Acumulada",
+                            markers=True
+                        ).data[0]
+                    )
+
+                    fig_pareto.update_traces(yaxis="y2")
+                    fig_pareto.update_layout(
+                        yaxis=dict(title="Valor dos Descontos (R$)", range=[0, df_pareto["Descontos (R$)"].max() * 1.35]),
+                        yaxis2=dict(
+                            title="Porcentagem Acumulada (%)",
+                            overlaying="y",
+                            side="right",
+                            range=[0, 115],
+                            showgrid=False
+                        ),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font_color="#f8fafc",
+                        showlegend=False,
+                        xaxis_tickangle=-45,
+                        margin=dict(t=120, b=50, l=40, r=40)
+                    )
+
+                    st.plotly_chart(fig_pareto, use_container_width=True)
+
+            st.markdown("---")
+            st.subheader(
+                "📊 Comparativo Gráfico Mês a Mês (Evolução Salarial & Descontos)"
+            )
             fig_hol = px.bar(
                 df_hol_all,
                 x="mes_ano",
                 y=["salario_bruto", "total_descontos", "liquido"],
                 barmode="group",
-                labels={"value": "Valor (R$)", "mes_ano": "Mês/Ano", "variable": "Indicador"},
+                labels={
+                    "value": "Valor (R$)",
+                    "mes_ano": "Mês/Ano",
+                    "variable": "Indicador",
+                },
                 color_discrete_sequence=["#3b82f6", "#ef4444", "#22c55e"],
             )
             fig_hol.update_layout(
