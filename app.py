@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # Versão atual e data da última alteração do sistema
-VERSAO_SISTEMA = "v2.5.8"
+VERSAO_SISTEMA = "v2.6.0"
 DATA_ATUALIZACAO = "10/08/2026"
 
 # ==========================================
@@ -820,8 +820,8 @@ if st.session_state.pagina_atual == "🏠 Início / Painel":
                 mudar_pagina("🎙️ Lançar por Voz")
                 st.rerun()
         with sub2:
-            if st.button("🤖 IA", use_container_width=True):
-                mudar_pagina("🤖 Assistente IA")
+            if st.button("📝 Tarefas", use_container_width=True):
+                mudar_pagina("📝 Tarefas & Compras")
                 st.rerun()
         with sub3:
             if st.button("🧾 Notas", use_container_width=True):
@@ -1131,586 +1131,172 @@ elif st.session_state.pagina_atual == "🎙️ Lançar por Voz":
         st.info("Nenhum lançamento por voz registrado ainda.")
 
 # ==========================================
-# --- SEÇÃO 2.2: ASSISTENTE IA & CHATBOT ---
+# --- SEÇÃO: TAREFAS & COMPRAS (SEPARADAS EM ABAS) ---
 # ==========================================
-elif st.session_state.pagina_atual == "🤖 Assistente IA":
+elif st.session_state.pagina_atual == "📝 Tarefas & Compras":
     botao_voltar()
-    st.subheader("🤖 Assistente Financeiro Inteligente (Chatbot IA)")
-    st.write(
-        "Converse com a Inteligência Artificial do seu gestor. Tire dúvidas sobre"
-        " seus gastos, peça insights gerenciais ou faça lançamentos automáticos"
-        " digitando no chat."
-    )
+    st.subheader("📝 Central de Organização: Compras & Tarefas")
+    st.write("Gerencie suas compras e tarefas em abas separadas, acompanhe valores e salve automaticamente ao marcar os itens.")
 
-    with st.expander("💡 Ajuda: O que ou como pedir para o Chatbot IA? (Clique para expandir)", expanded=False):
-        st.markdown(
-            """
-            Você pode interagir com o assistente usando frases naturais. Veja exemplos de comandos que você pode digitar:
-            * 📊 **Consultar Resumo ou Saldo:** 
-              * *"Qual é o meu saldo atual?"*
-              * *"Como estão minhas finanças?"*
-              * *"Me dê um resumo geral"*
-            * 🏆 **Identificar Maiores Gastos:** 
-              * *"Qual foi o meu maior gasto?"*
-              * *"Quais são os meus maiores gastos?"*
-            * 💸 **Lançar Despesas Rapidamente:** 
-              * *"Gastei 45 reais no mercado"*
-              * *"Comprei remédio na farmácia por 35.50"*
-              * *"Paguei 120 de luz"*
-            """
+    # Cria tabela unificada com suporte a valor e status
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS tarefas_compras (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            item TEXT, 
+            tipo TEXT, 
+            valor REAL,
+            concluido INTEGER
         )
+    """)
+    conn.commit()
 
-    if "historico_chat" not in st.session_state:
-        st.session_state.historico_chat = [{
-            "role": "assistant",
-            "content": (
-                "Olá Vinicius! Sou seu assistente financeiro IA. Como posso ajudar"
-                " nas suas finanças hoje? Você pode me pedir análises, maiores"
-                " gastos ou lançar despesas conversando comigo!"
-            ),
-        }]
-
-    for msg in st.session_state.historico_chat:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
-    user_query = st.chat_input(
-        "Digite sua pergunta ou comando para o Assistente IA..."
-    )
-
-    if user_query:
-        st.session_state.historico_chat.append(
-            {"role": "user", "content": user_query}
-        )
-        with st.chat_message("user"):
-            st.write(user_query)
-
-        query_up = user_query.upper()
-        resposta_ia = ""
-
-        df_trans_ia = pd.read_sql("SELECT * FROM transacoes", conn)
-        total_rec_ia = (
-            df_trans_ia[df_trans_ia["tipo"] == "Receita"]["valor"].sum()
-            if not df_trans_ia.empty
-            else 0.0
-        )
-        total_desp_ia = (
-            df_trans_ia[df_trans_ia["tipo"] == "Despesa"]["valor"].sum()
-            if not df_trans_ia.empty
-            else 0.0
-        )
-        saldo_caixa_ia = total_rec_ia - total_desp_ia
-
-        if any(k in query_up for k in ["GASTO", "MAIOR", "QUANTO GASTEI"]):
-            if not df_trans_ia.empty:
-                df_d_ia = df_trans_ia[df_trans_ia["tipo"] == "Despesa"]
-                if not df_d_ia.empty:
-                    maior_gasto = df_d_ia.sort_values(by="valor", ascending=False).iloc[0]
-                    resposta_ia = (
-                        f"📊 O seu maior gasto registrado é"
-                        f" **{maior_gasto['descricao']}** na categoria"
-                        f" *{maior_gasto['categoria']}* no valor de **R$"
-                        f" {maior_gasto['valor']:,.2f}**."
-                    )
-                else:
-                    resposta_ia = "Você ainda não possui despesas cadastradas no sistema."
-            else:
-                resposta_ia = "Seu banco de dados de transações está vazio no momento."
-
-        elif any(k in query_up for k in ["SALDO", "RESUMO", "COMO ESTOU"]):
-            resposta_ia = (
-                f"💰 **Resumo Financeiro Atual:**\n- Entradas Totais: R$"
-                f" {total_rec_ia:,.2f}\n- Saídas Totais: R$"
-                f" {total_desp_ia:,.2f}\n- Saldo em Caixa: R$ {saldo_caixa_ia:,.2f}"
-            )
-
-        elif any(k in query_up for k in ["PAGUEI", "GASTEI", "COMPREI", "LANCEI"]):
-            nums_chat = re.findall(r"(\d+(?:[.,]\d+)?)", user_query.replace(",", "."))
-            if nums_chat:
-                val_chat = float(nums_chat[0])
-                cat_c = categorizar_automaticamente(user_query, "Despesa")
-                c.execute(
-                    "INSERT INTO transacoes (data, tipo, descricao, categoria, valor,"
-                    " origem) VALUES (?,?,?,?,?,?)",
-                    (
-                        date.today().strftime("%Y-%m-%d"),
-                        "Despesa",
-                        user_query,
-                        cat_c,
-                        val_chat,
-                        "Chat_IA",
-                    ),
-                )
-                conn.commit()
-                resposta_ia = (
-                    f"✅ Lançado com sucesso pelo chat!\n- Descrição:"
-                    f" {user_query}\n- Valor: R$ {val_chat:,.2f}\n- Categoria: {cat_c}"
-                )
-            else:
-                resposta_ia = (
-                    "Não consegui identificar o valor numérico na sua frase de"
-                    " lançamento. Tente incluir o valor (ex: 'Gastei 150 no mercado')."
-                )
-
-        else:
-            resposta_ia = (
-                f"🤖 Compreendi sua pergunta. Analisei seus dados atuais: Saldo"
-                f" líquido projetado em R$ {saldo_caixa_ia:,.2f}. Você pode me pedir"
-                " para:\n1. Mostrar seu maior gasto\n2. Ver o resumo de saldo e"
-                " receitas\n3. Lançar despesas ou contas conversando diretamente"
-                " comigo!"
-            )
-
-        st.session_state.historico_chat.append(
-            {"role": "assistant", "content": resposta_ia}
-        )
-        with st.chat_message("assistant"):
-            st.write(resposta_ia)
-
-# ==========================================
-# --- SEÇÃO 2.3: LEITOR AUTOMÁTICO DE NOTAS FISCAIS ---
-# ==========================================
-elif st.session_state.pagina_atual == "🧾 Leitor de Notas Fiscais":
-    botao_voltar()
-    st.subheader(
-        "🧾 Leitor Automático de Cupons Fiscais & Notas (PDF, Upload JPG/PNG, Câmera ou Texto)"
-    )
-    st.write(
-        "Faça o upload do PDF ou de uma **foto/imagem (JPG, JPEG, PNG)** do seu cupom fiscal, tire uma foto instantânea com a câmera ou cole o texto. O sistema calibrará e extrairá os dados automaticamente!"
-    )
-
-    # Inicializa variáveis de controle de limpeza no session_state se não existirem
-    if "limpar_campos_nf" not in st.session_state:
-        st.session_state.limpar_campos_nf = False
-
-    tab_nf1, tab_nf2, tab_nf3 = st.tabs([
-        "📁 Upload de PDF ou Imagem (JPG/PNG)",
-        "📸 Tirar Foto com a Câmera",
-        "📋 Colar Texto do Cupom",
-    ])
-
-    with tab_nf1:
-        arquivo_nf_midia = st.file_uploader(
-            "Selecione o PDF ou a Imagem do Cupom (JPG/PNG)",
-            type=["pdf", "jpg", "jpeg", "png"],
-            key="upload_nf_midia",
-        )
-
-        if arquivo_nf_midia is not None:
-            nome_arq_up = arquivo_nf_midia.name.lower()
-
-            if nome_arq_up.endswith(".pdf"):
-                try:
-                    texto_nf_pdf = ""
-                    with pdfplumber.open(arquivo_nf_midia) as pdf:
-                        for pagina in pdf.pages:
-                            ext = pagina.extract_text()
-                            if ext:
-                                texto_nf_pdf += ext + "\n"
-
-                    st.success("PDF lido com sucesso!")
-                    estabelec = "Estabelecimento Comercial (PDF)"
-                    total_calculado = 45.90
-                    linhas_nf = texto_nf_pdf.split("\n")
-                    itens_extraidos = []
-
-                    for l in linhas_nf:
-                        l_up = l.upper()
-                        if "TOTAL" in l_up or "VALOR" in l_up:
-                            nums_tot = re.findall(r"(\d{1,3}(?:\.\d{3})*,\d{2})", l)
-                            if nums_tot:
-                                total_calculado = float(
-                                    nums_tot[-1].replace(".", "").replace(",", ".")
-                                )
-
-                        nums_linha = re.findall(r"(\d{1,3}(?:\.\d{3})*,\d{2})", l)
-                        if nums_linha and not any(
-                            p in l_up
-                            for p in ["TOTAL", "DINHEIRO", "CARTAO", "TROCO", "ICMS"]
-                        ):
-                            val_item = float(
-                                nums_linha[-1].replace(".", "").replace(",", ".")
-                            )
-                            prod_nome = l.replace(nums_linha[-1], "").strip()
-                            if len(prod_nome) > 2:
-                                cat_prod = categorizar_automaticamente(prod_nome, "Despesa")
-                                itens_extraidos.append({
-                                    "produto": prod_nome,
-                                    "quantidade": 1.0,
-                                    "valor_unitario": val_item,
-                                    "valor_total": val_item,
-                                    "categoria": cat_prod,
-                                })
-
-                    if not itens_extraidos:
-                        itens_extraidos.append({
-                            "produto": "Compra Geral - Cupom Fiscal PDF",
-                            "quantidade": 1.0,
-                            "valor_unitario": total_calculado,
-                            "valor_total": total_calculado,
-                            "categoria": "🛒 Supermercado (Necessidade)",
-                        })
-
-                    estab_input_pdf = st.text_input(
-                        "Estabelecimento Identificado:",
-                        value="Supermercado Shibata",
-                        key="estab_up_pdf",
-                    )
-                    val_input_pdf = st.number_input(
-                        "Valor Total Identificado (R$):",
-                        min_value=0.0,
-                        value=float(total_calculado),
-                        step=1.0,
-                        format="%.2f",
-                        key="val_up_pdf",
-                    )
-
-                    if st.button("Salvar Nota Fiscal em PDF no Sistema", use_container_width=True):
-                        c.execute(
-                            "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
-                            (
-                                date.today().strftime("%Y-%m-%d"),
-                                estab_input_pdf,
-                                val_input_pdf,
-                                arquivo_nf_midia.name,
-                            ),
-                        )
-                        nota_id_criada = c.lastrowid
-
-                        for it in itens_extraidos:
-                            c.execute(
-                                "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
-                                (
-                                    nota_id_criada,
-                                    it["produto"],
-                                    it["quantidade"],
-                                    it["valor_unitario"],
-                                    it["valor_total"],
-                                    it["categoria"],
-                                ),
-                            )
-
-                        c.execute(
-                            "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
-                            (
-                                date.today().strftime("%Y-%m-%d"),
-                                "Despesa",
-                                f"NF PDF: {estab_input_pdf}",
-                                categorizar_automaticamente(estab_input_pdf, "Despesa"),
-                                val_input_pdf,
-                                "Nota_Fiscal",
-                            ),
-                        )
-
-                        conn.commit()
-                        st.success(
-                            f"🎉 Nota fiscal em PDF processada e salva com sucesso! Total: R$ {val_input_pdf:,.2f}"
-                        )
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao processar PDF: {e}")
-
-            else:
-                st.image(
-                    arquivo_nf_midia,
-                    caption="Imagem do Cupom Fiscal Carregada com Sucesso",
-                    use_container_width=True,
-                )
-                st.success("🤖 Calibração automática da imagem realizada com sucesso!")
-
-                estab_img = st.text_input(
-                    "Nome do Estabelecimento:",
-                    value="Supermercado Shibata",
-                    key="estab_img_upload",
-                )
-                val_img_total = st.number_input(
-                    "Valor Total Calibrado da Nota (R$):",
-                    min_value=0.0,
-                    value=71.27,
-                    step=1.0,
-                    format="%.2f",
-                    key="val_img_upload",
-                )
-
-                if st.button("Processar Imagem do Cupom & Salvar Despesa", use_container_width=True):
-                    cat_img = categorizar_automaticamente(estab_img, "Despesa")
-
-                    c.execute(
-                        "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
-                        (
-                            date.today().strftime("%Y-%m-%d"),
-                            estab_img,
-                            val_img_total,
-                            arquivo_nf_midia.name,
-                        ),
-                    )
-                    n_id_img = c.lastrowid
-
-                    c.execute(
-                        "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
-                        (
-                            n_id_img,
-                            f"Itens em {estab_img}",
-                            1.0,
-                            val_img_total,
-                            val_img_total,
-                            cat_img,
-                        ),
-                    )
-
-                    c.execute(
-                        "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
-                        (
-                            date.today().strftime("%Y-%m-%d"),
-                            "Despesa",
-                            f"Cupom Imagem: {estab_img}",
-                            cat_img,
-                            val_img_total,
-                            "Nota_Fiscal",
-                        ),
-                    )
-
-                    conn.commit()
-                    st.success(
-                        f"🎉 Cupom Fiscal em imagem processado e salvo com sucesso! Total: R$ {val_img_total:,.2f}"
-                    )
-                    st.rerun()
-
-    with tab_nf2:
-        st.write("### 📸 Capturar Cupom Fiscal / QR Code via Câmera")
+    # Formulário único para cadastro rápido indicando se é Compra ou Tarefa
+    with st.form("form_nova_tarefa_compra", clear_on_submit=True):
+        col_t1, col_t2, col_t3 = st.columns([2, 1, 1])
+        with col_t1:
+            novo_item_texto = st.text_input("Descrição do Item ou Tarefa:")
+        with col_t2:
+            tipo_item = st.selectbox("Categoria:", ["🛒 Compra", "📋 Tarefa"])
+        with col_t3:
+            valor_item = st.number_input("Valor Estimado (R$):", min_value=0.0, step=10.0, format="%.2f")
         
-        # Usamos uma chave dinâmica ou limpamos o estado para evitar que o Streamlit lembre da foto anterior
-        foto_cupom_camera = st.camera_input(
-            "Aponte a câmera para o cupom fiscal ou QR Code e clique em Tirar Foto:",
-            key="widget_camera_nf"
-        )
-
-        if foto_cupom_camera is not None:
-            st.image(
-                foto_cupom_camera,
-                caption="Foto Capturada com Sucesso",
-                use_container_width=True,
-            )
-
-            estab_foto = st.text_input(
-                "Estabelecimento da Foto (Ex: Supermercado Shibata):",
-                value="Supermercado Shibata",
-                key="estab_foto_input",
-            )
-            val_foto_total = st.number_input(
-                "Valor Total da Nota Escaneada (R$):",
-                min_value=0.0,
-                value=71.27,
-                step=1.0,
-                format="%.2f",
-                key="val_foto_input",
-            )
-
-            if st.button("Processar Foto Escaneada & Salvar Despesa", use_container_width=True):
-                cat_foto = categorizar_automaticamente(estab_foto, "Despesa")
-
+        btn_add_item = st.form_submit_button("➕ Adicionar à Lista", use_container_width=True)
+        if btn_add_item:
+            if novo_item_texto.strip():
+                val_salvar = valor_item if tipo_item == "🛒 Compra" else 0.0
                 c.execute(
-                    "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
-                    (
-                        date.today().strftime("%Y-%m-%d"),
-                        estab_foto,
-                        val_foto_total,
-                        "Foto_Camera",
-                    ),
+                    "INSERT INTO tarefas_compras (item, tipo, valor, concluido) VALUES (?, ?, ?, 0)",
+                    (novo_item_texto.strip(), tipo_item, val_salvar)
                 )
-                n_id_cam = c.lastrowid
-
-                c.execute(
-                    "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
-                    (
-                        n_id_cam,
-                        f"Compra em {estab_foto} (Foto Câmera)",
-                        1.0,
-                        val_foto_total,
-                        val_foto_total,
-                        cat_foto,
-                    ),
-                )
-
-                c.execute(
-                    "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
-                    (
-                        date.today().strftime("%Y-%m-%d"),
-                        "Despesa",
-                        f"Cupom Câmera: {estab_foto}",
-                        cat_foto,
-                        val_foto_total,
-                        "Nota_Fiscal",
-                    ),
-                )
-
                 conn.commit()
-                
-                # Limpa explicitamente o cache da câmera no session_state para não memorizar a foto no próximo clique
-                if "widget_camera_nf" in st.session_state:
-                    del st.session_state["widget_camera_nf"]
-
-                st.success(
-                    f"🎉 Cupom escaneado via câmera salvo com sucesso! Total: R$ {val_foto_total:,.2f}"
-                )
+                st.success("Item adicionado com sucesso!")
                 st.rerun()
-
-    with tab_nf3:
-        with st.form("form_texto_cupom_fiscal"):
-            estab_txt = st.text_input(
-                "Nome do Estabelecimento (Ex: Supermercado Shibata, Drogaria Pacheco):",
-                value="Supermercado Shibata",
-            )
-            data_nf_txt = st.date_input(
-                "Data da Compra (DD/MM/AAAA):",
-                value=date.today(),
-                format="DD/MM/YYYY",
-            )
-            texto_copiado_nf = st.text_area(
-                "Cole aqui o texto copiado do cupom fiscal ou extrato do QR Code:",
-                placeholder="Ex:\n991012096 CERV. BUDWEISER LT.26 27,92\nTotal da Compra: 71,27",
-                height=150,
-            )
-
-            if st.form_submit_button("Processar Texto e Inserir no Sistema", use_container_width=True):
-                if texto_copiado_nf.strip():
-                    linhas_txt = texto_copiado_nf.split("\n")
-                    itens_txt_list = []
-                    tot_geral_txt = 0.0
-
-                    for lt in linhas_txt:
-                        lt_up = lt.upper()
-                        if "TOTAL" in lt_up:
-                            nums_gt = re.findall(r"(\d{1,3}(?:\.\d{3})*,\d{2})", lt)
-                            if nums_gt:
-                                tot_geral_txt = float(
-                                    nums_gt[-1].replace(".", "").replace(",", ".")
-                                )
-
-                        nums_lt = re.findall(r"(\d{1,3}(?:\.\d{3})*,\d{2})", lt)
-                        if nums_lt and not any(
-                            p in lt_up for p in ["TOTAL", "DINHEIRO", "CARTAO", "TROCO"]
-                        ):
-                            v_it = float(nums_lt[-1].replace(".", "").replace(",", "."))
-                            p_nome = lt.replace(nums_lt[-1], "").strip()
-                            if len(p_nome) > 1:
-                                cat_p = categorizar_automaticamente(p_nome, "Despesa")
-                                itens_txt_list.append({
-                                    "produto": p_nome,
-                                    "quantidade": 1.0,
-                                    "valor_unitario": v_it,
-                                    "valor_total": v_it,
-                                    "categoria": cat_p,
-                                })
-
-                    if tot_geral_txt == 0.0 and itens_txt_list:
-                        tot_geral_txt = sum(x["valor_total"] for x in itens_txt_list)
-
-                    if tot_geral_txt == 0.0:
-                        tot_geral_txt = 71.27
-
-                    if not itens_txt_list:
-                        itens_txt_list.append({
-                            "produto": f"Compra em {estab_txt}",
-                            "quantidade": 1.0,
-                            "valor_unitario": tot_geral_txt,
-                            "valor_total": tot_geral_txt,
-                            "categoria": categorizar_automaticamente(estab_txt, "Despesa"),
-                        })
-
-                    c.execute(
-                        "INSERT INTO notas_fiscais (data, estabelecimento, valor_total, origem_arquivo) VALUES (?,?,?,?)",
-                        (
-                            data_nf_txt.strftime("%Y-%m-%d"),
-                            estab_txt,
-                            tot_geral_txt,
-                            "Texto_Colado",
-                        ),
-                    )
-                    n_id = c.lastrowid
-
-                    for it_t in itens_txt_list:
-                        c.execute(
-                            "INSERT INTO itens_nota_fiscal (nota_id, produto, quantidade, valor_unitario, valor_total, categoria) VALUES (?,?,?,?,?,?)",
-                            (
-                                n_id,
-                                it_t["produto"],
-                                it_t["quantidade"],
-                                it_t["valor_unitario"],
-                                it_t["valor_total"],
-                                it_t["categoria"],
-                            ),
-                        )
-                        c.execute(
-                            "INSERT INTO transacoes (data, tipo, descricao, categoria, valor, origem) VALUES (?,?,?,?,?,?)",
-                            (
-                                data_nf_txt.strftime("%Y-%m-%d"),
-                                "Despesa",
-                                f"{estab_txt}: {it_t['produto']}",
-                                it_t["categoria"],
-                                it_t["valor_total"],
-                                "Nota_Fiscal",
-                            ),
-                        )
-
-                    conn.commit()
-                    st.success(
-                        f"🎉 Cupom fiscal processado com sucesso! Total: R$ {tot_geral_txt:,.2f}"
-                    )
-                    st.rerun()
-                else:
-                    st.warning("Cole o texto do cupom fiscal para prosseguir.")
+            else:
+                st.error("Digite a descrição do item.")
 
     st.markdown("---")
-    st.subheader("📋 Histórico de Notas Fiscais Processadas")
-    df_nf_all = pd.read_sql("SELECT * FROM notas_fiscais ORDER BY id DESC", conn)
-    if not df_nf_all.empty:
-        df_nf_all["data"] = df_nf_all["data"].apply(formatar_data_ptbr)
-        st.dataframe(
-            df_nf_all.rename(
-                columns={
-                    "id": "ID",
-                    "data": "Data",
-                    "estabelecimento": "Estabelecimento",
-                    "valor_total": "Valor Total (R$)",
-                    "origem_arquivo": "Origem",
-                }
-            ),
-            use_container_width=True,
-        )
 
-        sel_nf_detalhe = st.selectbox(
-            "Selecione o ID da nota fiscal para visualizar os itens detalhados:",
-            df_nf_all["id"].tolist(),
-        )
-        if sel_nf_detalhe:
-            df_itens_detalhe = pd.read_sql(
-                "SELECT produto, quantidade, valor_unitario, valor_total, categoria FROM itens_nota_fiscal WHERE nota_id = ?",
-                conn,
-                params=(sel_nf_detalhe,),
-            )
-            st.write(f"**Itens da Nota Fiscal ID {sel_nf_detalhe}:**")
-            st.dataframe(
-                df_itens_detalhe.rename(
-                    columns={
-                        "produto": "Produto",
-                        "quantidade": "Qtd",
-                        "valor_unitario": "Preço Unit. (R$)",
-                        "valor_total": "Total (R$)",
-                        "categoria": "Categoria",
-                    }
-                ),
-                use_container_width=True,
-            )
+    # Recupera os dados do banco
+    df_geral = pd.read_sql("SELECT * FROM tarefas_compras", conn)
 
-            if st.button("Excluir Nota Fiscal Selecionada", use_container_width=True):
-                c.execute("DELETE FROM itens_nota_fiscal WHERE nota_id = ?", (sel_nf_detalhe,))
-                c.execute("DELETE FROM notas_fiscais WHERE id = ?", (sel_nf_detalhe,))
-                conn.commit()
-                st.success("Nota fiscal e seus itens removidos com sucesso!")
-                st.rerun()
-    else:
-        st.info("Nenhuma nota fiscal processada até o momento.")
+    # Criação das Abas Separadas
+    aba_compras, aba_tarefas = st.tabs(["🛒 Lista de Compras", "📋 Lista de Tarefas"])
+
+    # ==========================================
+    # --- ABA 1: COMPRAS ---
+    # ==========================================
+    with aba_compras:
+        st.markdown("### 🛒 Gestão de Compras & Projeção de Gastos")
+        df_compras = df_geral[df_geral["tipo"] == "🛒 Compra"] if not df_geral.empty else pd.DataFrame()
+
+        if not df_compras.empty:
+            total_compras = len(df_compras)
+            compras_feitas = len(df_compras[df_compras["concluido"] == 1])
+            prog_compras = (compras_feitas / total_compras) * 100 if total_compras > 0 else 0.0
+
+            # Projeção: Soma dos valores de itens de compra pendentes
+            df_comp_pend = df_compras[df_compras["concluido"] == 0]
+            total_projetado = df_comp_pend["valor"].sum() if not df_comp_pend.empty else 0.0
+            total_gasto_efetivado = df_compras[df_compras["concluido"] == 1]["valor"].sum() if not df_compras.empty else 0.0
+
+            st.markdown(f"**Progresso das Compras: {prog_compras:.1f}% Concluído**")
+            st.progress(prog_compras / 100.0)
+
+            c_m1, c_m2, c_m3 = st.columns(3)
+            c_m1.metric("💰 Projeção (Falta Comprar)", f"R$ {total_projetado:,.2f}")
+            c_m2.metric("✅ Total Já Comprado", f"R$ {total_gasto_efetivado:,.2f}")
+            c_m3.metric("📦 Itens na Lista", total_compras)
+
+            st.markdown("---")
+            for index, row in df_compras.iterrows():
+                col_c_chk, col_c_val, col_c_edit, col_c_del = st.columns([4, 2, 1, 1])
+                
+                status_c = True if row["concluido"] == 1 else False
+                label_c = f"{row['item']}"
+                valor_str = f"R$ {row['valor']:,.2f}" if row['valor'] > 0 else "R$ 0,00"
+
+                with col_c_chk:
+                    marcado_c = st.checkbox(label_c, value=status_c, key=f"check_compra_{row['id']}")
+                    novo_est_c = 1 if marcado_c else 0
+                    if novo_est_c != row["concluido"]:
+                        c.execute("UPDATE tarefas_compras SET concluido = ? WHERE id = ?", (novo_est_c, row["id"]))
+                        conn.commit()
+                        st.rerun()
+
+                with col_c_val:
+                    st.markdown(f"**{valor_str}**")
+
+                with col_c_edit:
+                    with st.popover("✏️"):
+                        with st.form(f"form_edit_c_{row['id']}"):
+                            nc_desc = st.text_input("Item", value=row["item"])
+                            nc_val = st.number_input("Valor", value=float(row["valor"]), step=10.0)
+                            if st.form_submit_button("Salvar"):
+                                c.execute("UPDATE tarefas_compras SET item = ?, valor = ? WHERE id = ?", (nc_desc, nc_val, row["id"]))
+                                conn.commit()
+                                st.rerun()
+
+                with col_c_del:
+                    if st.button("🗑️", key=f"del_compra_{row['id']}"):
+                        c.execute("DELETE FROM tarefas_compras WHERE id = ?", (row["id"],))
+                        conn.commit()
+                        st.rerun()
+                st.markdown("<hr style='margin: 4px 0; border-color: rgba(255,255,255,0.05);'>", unsafe_allow_html=True)
+        else:
+            st.info("Nenhum item de compra cadastrado.")
+
+    # ==========================================
+    # --- ABA 2: TAREFAS ---
+    # ==========================================
+    with aba_tarefas:
+        st.markdown("### 📋 Gestão de Tarefas & Pendências")
+        df_tarefas = df_geral[df_geral["tipo"] == "📋 Tarefa"] if not df_geral.empty else pd.DataFrame()
+
+        if not df_tarefas.empty:
+            total_t = len(df_tarefas)
+            t_fechadas = len(df_tarefas[df_tarefas["concluido"] == 1])
+            prog_t = (t_fechadas / total_t) * 100 if total_t > 0 else 0.0
+
+            st.markdown(f"**Progresso das Tarefas: {prog_t:.1f}% Concluído**")
+            st.progress(prog_t / 100.0)
+
+            t_m1, t_m2, t_m3 = st.columns(3)
+            t_m1.metric("Total de Tarefas", total_t)
+            t_m2.metric("Concluídas", t_fechadas)
+            t_m3.metric("Pendentes", total_t - t_fechadas)
+
+            st.markdown("---")
+            for index, row in df_tarefas.iterrows():
+                col_t_chk, col_t_edit, col_t_del = st.columns([6, 1, 1])
+                
+                status_t = True if row["concluido"] == 1 else False
+                label_t = f"{row['item']}"
+
+                with col_t_chk:
+                    marcado_t = st.checkbox(label_t, value=status_t, key=f"check_tarefa_aba_{row['id']}")
+                    novo_est_t = 1 if marcado_t else 0
+                    if novo_est_t != row["concluido"]:
+                        c.execute("UPDATE tarefas_compras SET concluido = ? WHERE id = ?", (novo_est_t, row["id"]))
+                        conn.commit()
+                        st.rerun()
+
+                with col_t_edit:
+                    with st.popover("✏️"):
+                        with st.form(f"form_edit_t_{row['id']}"):
+                            nt_desc = st.text_input("Tarefa", value=row["item"])
+                            if st.form_submit_button("Salvar"):
+                                c.execute("UPDATE tarefas_compras SET item = ? WHERE id = ?", (nt_desc, row["id"]))
+                                conn.commit()
+                                st.rerun()
+
+                with col_t_del:
+                    if st.button("🗑️", key=f"del_tarefa_aba_{row['id']}"):
+                        c.execute("DELETE FROM tarefas_compras WHERE id = ?", (row["id"],))
+                        conn.commit()
+                        st.rerun()
+                st.markdown("<hr style='margin: 4px 0; border-color: rgba(255,255,255,0.05);'>", unsafe_allow_html=True)
+        else:
+            st.info("Nenhuma tarefa cadastrada.")
 
 # ==========================================
 # --- SEÇÃO 2.4: VEÍCULOS, MANUTENÇÕES & COMBUSTÍVEIS ---
